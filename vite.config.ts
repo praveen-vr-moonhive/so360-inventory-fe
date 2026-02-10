@@ -34,10 +34,56 @@ export default defineConfig({
     },
     server: {
         port: 3005,
-        cors: true, // Allow Shell to load remoteEntry.js
+        cors: true,
+        proxy: {
+            '/v1/inventory': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1/procurement': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1/vendors': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1/warehouses': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1': {
+                target: 'http://localhost:3000',
+                changeOrigin: true,
+            },
+        },
+
     },
+
     preview: {
         port: 3005,
         cors: true,
+        proxy: {
+            '/v1/inventory': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1/procurement': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1/vendors': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1/warehouses': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1': {
+                target: 'http://localhost:3000',
+                changeOrigin: true,
+            },
+        },
     },
 });
