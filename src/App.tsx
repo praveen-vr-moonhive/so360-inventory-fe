@@ -1,58 +1,144 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 // Lazy load pages for performance
 const ItemsPage = lazy(() => import('./pages/ItemsPage'));
+const ItemCreatePage = lazy(() => import('./pages/item-create/ItemCreatePage'));
 const ItemDetailPage = lazy(() => import('./pages/ItemDetailPage'));
 const StockLocationsPage = lazy(() => import('./pages/StockLocationsPage'));
+const WarehouseDetailPage = lazy(() => import('./pages/WarehouseDetailPage'));
 const StockOverviewPage = lazy(() => import('./pages/StockOverviewPage'));
 const StockAdjustmentsPage = lazy(() => import('./pages/StockAdjustmentsPage'));
 const StockTransfersPage = lazy(() => import('./pages/StockTransfersPage'));
 const MovementsPage = lazy(() => import('./pages/MovementsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const ProductTypeSettingsPage = lazy(() => import('./pages/settings/ProductTypeSettingsPage'));
+const PRListPage = lazy(() => import('./pages/procurement/PRListPage'));
+const PRDetailPage = lazy(() => import('./pages/procurement/PRDetailPage'));
+const POListPage = lazy(() => import('./pages/procurement/POListPage'));
+const PODetailPage = lazy(() => import('./pages/procurement/PODetailPage'));
+const GRNListPage = lazy(() => import('./pages/procurement/GRNListPage'));
+const GRNDetailPage = lazy(() => import('./pages/procurement/GRNDetailPage'));
+const GRNEntryPage = lazy(() => import('./pages/procurement/GRNEntryPage'));
+const VendorListPage = lazy(() => import('./pages/vendors/VendorListPage'));
+const VendorDetailPage = lazy(() => import('./pages/vendors/VendorDetailPage'));
+const ContractsPage = lazy(() => import('./pages/vendors/ContractsPage'));
+
+
+
+import { ShellContext } from '@so360/shell-context';
+import { inventoryService } from './services/inventoryService';
+import { procurementService } from './services/procurementService';
+import { vendorService } from './services/vendorService';
+import { mediaService } from './services/mediaService';
+
+
+const MfeShellInitializer = ({ children }: { children: React.ReactNode }) => {
+    const shell = React.useContext(ShellContext);
+    const [isSynced, setIsSynced] = React.useState(false);
+
+    React.useEffect(() => {
+        if (shell?.currentOrg?.id && shell?.accessToken) {
+            inventoryService.setOrgId(shell.currentOrg.id);
+            inventoryService.setAccessToken(shell.accessToken);
+            if (shell.currentTenant?.id) {
+                inventoryService.setTenantId(shell.currentTenant.id);
+            }
+            mediaService.setAccessToken(shell.accessToken);
+            // Procurement and Vendor services might need similar initialization if not shared
+            (procurementService as any).accessToken = shell.accessToken;
+            (vendorService as any).accessToken = shell.accessToken;
+            vendorService.setUserId(shell.user?.id || '');
+            setIsSynced(true);
+
+        }
+    }, [shell]);
+
+    if (!isSynced) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <div className="w-12 h-12 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin"></div>
+                <div className="text-slate-500 font-medium animate-pulse text-sm">Connecting to shell...</div>
+            </div>
+        );
+    }
+
+    return <>{children}</>;
+};
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-500/30">
-            <main className="w-full">
-                <Suspense fallback={
-                    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                        <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-                        <div className="text-slate-500 font-medium animate-pulse text-sm">Loading Inventory Module...</div>
-                    </div>
-                }>
-                    {children}
-                </Suspense>
-            </main>
+            <MfeShellInitializer>
+                <main className="w-full">
+                    <Suspense fallback={
+                        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                            <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                            <div className="text-slate-500 font-medium animate-pulse text-sm">Loading Inventory Module...</div>
+                        </div>
+                    }>
+                        {children}
+                    </Suspense>
+                </main>
+            </MfeShellInitializer>
         </div>
     );
+};
+
+
+const ContextAwareIndex = () => {
+    const location = useLocation();
+    const basePath = location.pathname.split('/')[1]; // 'inventory' | 'procurement' | 'vendors'
+
+    if (basePath === 'vendors') return <VendorListPage />;
+    if (basePath === 'procurement') return <Navigate to="pr" replace />;
+    return <Navigate to="items" replace />;
 };
 
 const App = () => {
     return (
         <Layout>
             <Routes>
-                <Route path="/" element={<Navigate to="items" replace />} />
+                {/* Context-aware index route */}
+                <Route path="/" element={<ContextAwareIndex />} />
 
-                {/* 1. Items List & Detail */}
+                {/* ── Inventory routes (mounted at /inventory/*) ── */}
                 <Route path="items" element={<ItemsPage />} />
+                <Route path="items/new" element={<ItemCreatePage />} />
                 <Route path="items/:id" element={<ItemDetailPage />} />
-
-                {/* 2. Stock Locations */}
                 <Route path="locations" element={<StockLocationsPage />} />
-
-                {/* 3. Stock Overview */}
+                <Route path="warehouses/:id" element={<WarehouseDetailPage />} />
                 <Route path="overview" element={<StockOverviewPage />} />
-
-                {/* 4. Movements (Combined) */}
                 <Route path="movements" element={<MovementsPage />} />
-
-                {/* 5. Direct Movement Access (Optional) */}
                 <Route path="adjustments" element={<StockAdjustmentsPage />} />
                 <Route path="transfers" element={<StockTransfersPage />} />
-
-                {/* 6. Settings */}
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="settings/product-types" element={<ProductTypeSettingsPage />} />
+
+                {/* ── Procurement routes (mounted at /procurement/*) ── */}
+                <Route path="pr" element={<PRListPage />} />
+                <Route path="pr/:id" element={<PRDetailPage />} />
+                <Route path="po" element={<POListPage />} />
+                <Route path="po/:id" element={<PODetailPage />} />
+                <Route path="grn" element={<GRNListPage />} />
+                <Route path="grn/new" element={<GRNEntryPage />} />
+                <Route path="grn/:id" element={<GRNDetailPage />} />
+
+                {/* ── Vendor routes (mounted at /vendors/*) ── */}
+                <Route path="contracts" element={<ContractsPage />} />
+                <Route path=":id" element={<VendorDetailPage />} />
+
+                {/* ── Backward-compat: old /inventory/procurement/... and /inventory/vendors/... ── */}
+                <Route path="procurement/pr" element={<PRListPage />} />
+                <Route path="procurement/pr/:id" element={<PRDetailPage />} />
+                <Route path="procurement/po" element={<POListPage />} />
+                <Route path="procurement/po/:id" element={<PODetailPage />} />
+                <Route path="procurement/grn" element={<GRNListPage />} />
+                <Route path="procurement/grn/new" element={<GRNEntryPage />} />
+                <Route path="procurement/grn/:id" element={<GRNDetailPage />} />
+                <Route path="vendors" element={<VendorListPage />} />
+                <Route path="vendors/:id" element={<VendorDetailPage />} />
+                <Route path="vendors/contracts" element={<ContractsPage />} />
 
                 {/* Legacy Redirects */}
                 <Route path="products" element={<Navigate to="../items" replace />} />

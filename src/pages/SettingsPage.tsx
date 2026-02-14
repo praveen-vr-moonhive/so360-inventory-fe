@@ -1,51 +1,126 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Save, Box, Tag, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Settings, Save, Box, Tag, MapPin, AlertCircle, CheckCircle2, X, Plus, Sliders, ChevronRight } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
-import { InventorySettings } from '../types/inventory';
 import { useAuth } from '../hooks/useAuth';
+import CategoryTreeView from '../components/categories/CategoryTreeView';
+import { buildCategoryTree } from '../utils/categoryTree';
+
+interface UomItem {
+    id: string;
+    name: string;
+    abbreviation: string;
+}
+
+interface CategoryItem {
+    id: string;
+    name: string;
+    description?: string;
+}
+
+interface InventorySettingsData {
+    uoms: UomItem[];
+    categories: CategoryItem[];
+}
 
 const SettingsPage = () => {
+    const navigate = useNavigate();
     const { can } = useAuth();
-    const [settings, setSettings] = useState<InventorySettings | null>(null);
+    const [settings, setSettings] = useState<InventorySettingsData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    // Add UoM state
+    const [showAddUom, setShowAddUom] = useState(false);
+    const [newUomName, setNewUomName] = useState('');
+    const [newUomAbbr, setNewUomAbbr] = useState('');
+    const [addingUom, setAddingUom] = useState(false);
+
+    // Add Category state
+    const [showAddCategory, setShowAddCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryDesc, setNewCategoryDesc] = useState('');
+    const [addingCategory, setAddingCategory] = useState(false);
+
+    const fetchSettings = async () => {
+        try {
+            setIsLoading(true);
+            const data = await inventoryService.getSettings();
+            setSettings(data);
+            setError(null);
+        } catch (err: any) {
+            setError(err.message || 'Failed to load settings');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchSettings = async () => {
-            try {
-                // For MVP, we'll fetch what we have. 
-                // The service might need adjustment but let's mock the UI for now
-                // In Step 49 I defined InventorySettings as { uoms: string[], categories: string[] }
-                // Let's stick to that.
-                setSettings({
-                    uoms: ['Units', 'Hours', 'Kilograms', 'Boxes', 'Liters'],
-                    categories: ['Electronics', 'Furniture', 'Raw Materials', 'Finished Goods', 'Services']
-                });
-            } catch (err) {
-                setError('Failed to load settings');
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchSettings();
     }, []);
 
-    const handleSave = async () => {
-        if (!settings) return;
-        setIsSaving(true);
+    const handleAddUom = async () => {
+        if (!newUomName.trim() || !newUomAbbr.trim()) return;
+        setAddingUom(true);
         setError(null);
-        setSuccess(false);
         try {
-            // Simulated save
-            await new Promise(r => setTimeout(r, 1000));
+            await inventoryService.createUom(newUomName.trim(), newUomAbbr.trim());
+            setNewUomName('');
+            setNewUomAbbr('');
+            setShowAddUom(false);
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
-        } catch (err) {
-            setError('Failed to save settings');
+            await fetchSettings();
+        } catch (err: any) {
+            setError(err.message || 'Failed to add unit of measure');
         } finally {
-            setIsSaving(false);
+            setAddingUom(false);
+        }
+    };
+
+    const handleDeleteUom = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this unit of measure?')) return;
+        setError(null);
+        try {
+            await inventoryService.deleteUom(id);
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+            await fetchSettings();
+        } catch (err: any) {
+            setError(err.message || 'Failed to delete unit of measure');
+        }
+    };
+
+    const handleAddCategory = async () => {
+        if (!newCategoryName.trim()) return;
+        setAddingCategory(true);
+        setError(null);
+        try {
+            await inventoryService.createCategory(newCategoryName.trim(), newCategoryDesc.trim() || undefined);
+            setNewCategoryName('');
+            setNewCategoryDesc('');
+            setShowAddCategory(false);
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+            await fetchSettings();
+        } catch (err: any) {
+            setError(err.message || 'Failed to add category');
+        } finally {
+            setAddingCategory(false);
+        }
+    };
+
+    const handleDeleteCategory = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this category?')) return;
+        setError(null);
+        try {
+            await inventoryService.deleteCategory(id);
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+            await fetchSettings();
+        } catch (err: any) {
+            setError(err.message || 'Failed to delete category');
         }
     };
 
@@ -53,22 +128,11 @@ const SettingsPage = () => {
 
     return (
         <div className="p-8 max-w-4xl mx-auto">
-            <header className="mb-8 flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                        <Settings className="text-slate-400" /> Inventory Settings
-                    </h1>
-                    <p className="text-slate-400 mt-1">Configure units, categories, and module defaults</p>
-                </div>
-                {can('manage_locations') && (
-                    <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg shadow-blue-900/20 active:scale-95 disabled:opacity-50"
-                    >
-                        {isSaving ? 'Saving...' : <><Save size={20} /> Save Changes</>}
-                    </button>
-                )}
+            <header className="mb-8">
+                <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                    <Settings className="text-slate-400" /> Inventory Settings
+                </h1>
+                <p className="text-slate-400 mt-1">Configure units, categories, and module defaults</p>
             </header>
 
             {error && (
@@ -92,14 +156,57 @@ const SettingsPage = () => {
                         <Box size={20} className="text-blue-500" /> Units of Measure (UoM)
                     </h2>
                     <div className="flex flex-wrap gap-2">
-                        {settings?.uoms.map((uom, i) => (
-                            <div key={i} className="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-sm text-slate-300 flex items-center gap-2">
-                                {uom}
+                        {settings?.uoms.map((uom: UomItem) => (
+                            <div key={uom.id} className="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-sm text-slate-300 flex items-center gap-2 group">
+                                <span>{uom.name} ({uom.abbreviation})</span>
+                                {can('manage_locations') && (
+                                    <button
+                                        onClick={() => handleDeleteUom(uom.id)}
+                                        className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-300 transition-all"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
                             </div>
                         ))}
-                        <button className="border border-dashed border-slate-700 px-3 py-1.5 rounded-lg text-sm text-slate-500 hover:text-slate-400 hover:border-slate-500 transition-all">
-                            + Add Unit
-                        </button>
+                        {showAddUom ? (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Name"
+                                    value={newUomName}
+                                    onChange={(e) => setNewUomName(e.target.value)}
+                                    className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-sm text-white w-24"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Abbr"
+                                    value={newUomAbbr}
+                                    onChange={(e) => setNewUomAbbr(e.target.value)}
+                                    className="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-sm text-white w-16"
+                                />
+                                <button
+                                    onClick={handleAddUom}
+                                    disabled={addingUom}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-sm disabled:opacity-50"
+                                >
+                                    {addingUom ? '...' : 'Add'}
+                                </button>
+                                <button
+                                    onClick={() => setShowAddUom(false)}
+                                    className="text-slate-400 hover:text-white"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowAddUom(true)}
+                                className="border border-dashed border-slate-700 px-3 py-1.5 rounded-lg text-sm text-slate-500 hover:text-slate-400 hover:border-slate-500 transition-all flex items-center gap-1"
+                            >
+                                <Plus size={14} /> Add Unit
+                            </button>
+                        )}
                     </div>
                     <p className="mt-4 text-xs text-slate-500 italic">Define standard units for stocks and services (e.g., Pcs, KG, Hrs)</p>
                 </section>
@@ -109,16 +216,61 @@ const SettingsPage = () => {
                     <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <Tag size={20} className="text-purple-500" /> Item Categories
                     </h2>
-                    <div className="flex flex-wrap gap-2">
-                        {settings?.categories.map((cat, i) => (
-                            <div key={i} className="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-sm text-slate-300">
-                                {cat}
-                            </div>
-                        ))}
-                        <button className="border border-dashed border-slate-700 px-3 py-1.5 rounded-lg text-sm text-slate-500 hover:text-slate-400 hover:border-slate-500 transition-all">
-                            + Add Category
-                        </button>
-                    </div>
+                    <CategoryTreeView
+                        tree={buildCategoryTree(settings?.categories || [])}
+                        onAdd={async (name, description, parentId) => {
+                            setError(null);
+                            try {
+                                await inventoryService.createCategory(name, description || undefined, parentId);
+                                setSuccess(true);
+                                setTimeout(() => setSuccess(false), 3000);
+                                await fetchSettings();
+                            } catch (err: any) {
+                                setError(err.message || 'Failed to add category');
+                            }
+                        }}
+                        onUpdate={async (id, data) => {
+                            setError(null);
+                            try {
+                                await inventoryService.updateCategory(id, data);
+                                setSuccess(true);
+                                setTimeout(() => setSuccess(false), 3000);
+                                await fetchSettings();
+                            } catch (err: any) {
+                                setError(err.message || 'Failed to update category');
+                            }
+                        }}
+                        onDelete={async (id) => {
+                            setError(null);
+                            try {
+                                await inventoryService.deleteCategory(id);
+                                setSuccess(true);
+                                setTimeout(() => setSuccess(false), 3000);
+                                await fetchSettings();
+                            } catch (err: any) {
+                                setError(err.message || 'Failed to delete category');
+                            }
+                        }}
+                        canManage={can('manage_locations')}
+                    />
+                </section>
+
+                {/* Product Types */}
+                <section className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                    <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                        <Sliders size={20} className="text-blue-500" /> Product Types
+                    </h2>
+                    <p className="text-sm text-slate-500 mb-4">Define product type templates with custom attribute fields (e.g. Electronics, Clothing)</p>
+                    <button
+                        onClick={() => navigate('/inventory/settings/product-types')}
+                        className="w-full flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/50 transition-all group"
+                    >
+                        <div className="text-left">
+                            <p className="text-sm font-semibold text-slate-200">Manage Product Types</p>
+                            <p className="text-xs text-slate-500">View system templates, create custom types, define attribute schemas</p>
+                        </div>
+                        <ChevronRight size={18} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+                    </button>
                 </section>
 
                 {/* Integration Rules */}

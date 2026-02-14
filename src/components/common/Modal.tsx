@@ -6,9 +6,17 @@ interface ModalProps {
     onClose: () => void;
     title: string;
     children: React.ReactNode;
+    size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+const sizeClasses: Record<string, string> = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+};
+
+export const Modal = ({ isOpen, onClose, title, children, size = 'md' }: ModalProps) => {
     if (!isOpen) return null;
 
     return (
@@ -17,7 +25,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
                 className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
                 onClick={onClose}
             />
-            <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className={`relative bg-slate-900 border border-slate-800 rounded-2xl w-full ${sizeClasses[size]} shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200`}>
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
                     <h3 className="text-xl font-bold text-white">{title}</h3>
                     <button
@@ -27,7 +35,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
                         <X size={20} />
                     </button>
                 </div>
-                <div className="p-6">
+                <div className="p-6 max-h-[85vh] overflow-y-auto">
                     {children}
                 </div>
             </div>

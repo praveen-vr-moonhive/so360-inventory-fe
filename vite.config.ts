@@ -52,6 +52,10 @@ export default defineConfig({
                 target: 'http://localhost:3006',
                 changeOrigin: true,
             },
+            '/v1/documents': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
             '/v1': {
                 target: 'http://localhost:3000',
                 changeOrigin: true,
@@ -77,6 +81,10 @@ export default defineConfig({
                 changeOrigin: true,
             },
             '/v1/warehouses': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/v1/documents': {
                 target: 'http://localhost:3006',
                 changeOrigin: true,
             },
