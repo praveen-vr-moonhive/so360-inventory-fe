@@ -2,7 +2,30 @@ class InventoryService {
     private orgId: string | null = null;
     private tenantId: string | null = null;
     private accessToken: string | null = null;
-    private baseUrl = '/v1/inventory';
+    private inventoryOrigin: string;
+    private coreOrigin: string;
+    private baseUrl: string;
+
+    constructor() {
+        const win = typeof window !== 'undefined' ? (window as any) : undefined;
+        const env = (import.meta as any)?.env || {};
+
+        const invOrigin =
+            (win && win.VITE_SO360_INVENTORY_API) ||
+            env.VITE_SO360_INVENTORY_API ||
+            env.VITE_API_BASE_URL ||
+            'http://localhost:3006';
+
+        const coreOrigin =
+            (win && win.VITE_SO360_CORE_API) ||
+            env.VITE_SO360_CORE_API ||
+            env.VITE_API_BASE_URL ||
+            'http://localhost:3000';
+
+        this.inventoryOrigin = String(invOrigin).replace(/\/$/, '');
+        this.coreOrigin = String(coreOrigin).replace(/\/$/, '');
+        this.baseUrl = `${this.inventoryOrigin}/v1/inventory`;
+    }
 
     setOrgId(id: string) {
         this.orgId = id;
@@ -100,9 +123,11 @@ class InventoryService {
     }
 
     async getWarehouse(id: string) {
-        const response = await fetch(`/v1/warehouses/detail/${id}`, {
+        const response = await fetch(`${this.inventoryOrigin}/v1/warehouses/detail/${id}`, {
             headers: {
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
             }
         });
         if (!response.ok) throw new Error('Failed to load warehouse');
@@ -110,11 +135,12 @@ class InventoryService {
     }
 
     async createWarehouse(dto: any) {
-        const response = await fetch('/v1/warehouses', {
+        const response = await fetch(`${this.inventoryOrigin}/v1/warehouses`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
                 'X-Org-Id': this.orgId || '',
             },
             body: JSON.stringify(dto),
@@ -127,11 +153,13 @@ class InventoryService {
     }
 
     async updateWarehouse(id: string, dto: any) {
-        const response = await fetch(`/v1/warehouses/${id}`, {
+        const response = await fetch(`${this.inventoryOrigin}/v1/warehouses/${id}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
             },
             body: JSON.stringify(dto),
         });
@@ -140,10 +168,12 @@ class InventoryService {
     }
 
     async deleteWarehouse(id: string) {
-        const response = await fetch(`/v1/warehouses/${id}`, {
+        const response = await fetch(`${this.inventoryOrigin}/v1/warehouses/${id}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
             }
         });
         if (!response.ok) {
@@ -155,11 +185,13 @@ class InventoryService {
 
     // Storage Locations
     async createLocation(warehouseId: string, dto: { name: string; code: string }) {
-        const response = await fetch(`/v1/warehouses/${warehouseId}/locations`, {
+        const response = await fetch(`${this.inventoryOrigin}/v1/warehouses/${warehouseId}/locations`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
             },
             body: JSON.stringify(dto),
         });
@@ -171,11 +203,13 @@ class InventoryService {
     }
 
     async updateLocation(locationId: string, dto: { name?: string; code?: string; is_active?: boolean }) {
-        const response = await fetch(`/v1/warehouses/locations/${locationId}`, {
+        const response = await fetch(`${this.inventoryOrigin}/v1/warehouses/locations/${locationId}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
             },
             body: JSON.stringify(dto),
         });
@@ -187,10 +221,12 @@ class InventoryService {
     }
 
     async deleteLocation(locationId: string) {
-        const response = await fetch(`/v1/warehouses/locations/${locationId}`, {
+        const response = await fetch(`${this.inventoryOrigin}/v1/warehouses/locations/${locationId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
             },
         });
         if (!response.ok) {
@@ -228,9 +264,12 @@ class InventoryService {
 
     // Simple getItems for Master Catalog (if separate)
     async getCatalogItems() {
-        const response = await fetch(`/v1/products/${this.orgId}`, {
+        const response = await fetch(`${this.coreOrigin}/v1/products/${this.orgId}`, {
             headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
             }
         });
         return response.json();
@@ -240,7 +279,7 @@ class InventoryService {
 
     async getBusinessSettings() {
         if (!this.orgId) throw new Error('OrgId not set');
-        const response = await fetch(`/v1/business-settings/${this.orgId}`, {
+        const response = await fetch(`${this.coreOrigin}/v1/business-settings/${this.orgId}`, {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.accessToken}`,
