@@ -49,6 +49,8 @@ const POListPage = () => {
                     unit_price: line.estimated_unit_price,
                     description: line.description || '',
                     pr_line_id: line.pr_line_id,
+                    tax_rate: 0,
+                    tax_amount: 0,
                 }));
             setItems(prefillItems);
             setShowForm(true);
@@ -93,12 +95,28 @@ const POListPage = () => {
     };
 
     const addItemLine = () => {
-        setItems([...items, { item_id: '', quantity: 1, unit_price: 0, description: '' }]);
+        setItems([...items, { item_id: '', quantity: 1, unit_price: 0, description: '', tax_rate: 0, tax_amount: 0 }]);
     };
 
     const updateItem = (index: number, field: string, value: any) => {
         const newItems = [...items];
         newItems[index][field] = value;
+
+        // When item is selected, auto-populate tax rate from catalog
+        if (field === 'item_id') {
+            const catalogItem = catalogItems.find((it: any) => it.id === value);
+            if (catalogItem?.tax_code_id) {
+                // tax_rate will be resolved server-side; show placeholder as 0 here
+                newItems[index].tax_code_id = catalogItem.tax_code_id;
+                newItems[index].tax_rate = 0;
+                newItems[index].tax_amount = 0;
+            } else {
+                newItems[index].tax_code_id = null;
+                newItems[index].tax_rate = 0;
+                newItems[index].tax_amount = 0;
+            }
+        }
+
         setItems(newItems);
     };
 
@@ -106,8 +124,15 @@ const POListPage = () => {
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const calculateTotal = () => {
-        return items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0), 0);
+    const isTaxInclusive = settings?.is_tax_inclusive_pricing ?? false;
+
+    const calculateTotals = () => {
+        const subtotal = items.reduce((sum, item) =>
+            sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0), 0);
+        // Tax is resolved server-side; frontend shows 0 until PO is saved
+        const taxTotal = items.reduce((sum, item) => sum + (parseFloat(item.tax_amount) || 0), 0);
+        const total = isTaxInclusive ? subtotal : subtotal + taxTotal;
+        return { subtotal, taxTotal, total };
     };
 
     const openNewPOForm = () => {
@@ -126,13 +151,15 @@ const POListPage = () => {
         const validItems = items.filter(i => i.item_id && i.quantity > 0 && i.unit_price > 0);
         if (validItems.length === 0) { alert('Add at least one complete item line.'); return; }
 
+        const { total } = calculateTotals();
+
         setSubmitting(true);
         try {
             await procurementService.createPO({
                 vendor_id: formData.vendor_id,
                 po_number: formData.po_number,
                 pr_id: formData.pr_id || undefined,
-                total_amount: calculateTotal(),
+                total_amount: total,
                 currency: formData.currency,
                 terms: formData.terms || undefined,
                 shipping_address: formData.shipping_address || undefined,
@@ -174,6 +201,8 @@ const POListPage = () => {
                     unit_price: line.estimated_unit_price,
                     description: line.description || '',
                     pr_line_id: line.pr_line_id,
+                    tax_rate: 0,
+                    tax_amount: 0,
                 }));
             setItems(prefillItems);
             setShowForm(true);
@@ -181,6 +210,8 @@ const POListPage = () => {
             alert(error.message || 'Conversion failed');
         }
     };
+
+    const { subtotal, taxTotal, total } = calculateTotals();
 
     return (
         <div className="p-8 space-y-8 animate-in fade-in duration-700">
@@ -436,63 +467,94 @@ const POListPage = () => {
                                         No items added yet. Click "+ Add Item" to begin.
                                     </div>
                                 )}
-                                {items.map((item, idx) => (
-                                    <div key={idx} className="flex gap-3 items-end animate-in slide-in-from-top-2 duration-300">
-                                        <div className="flex-1 space-y-1">
-                                            <select
-                                                value={item.item_id}
-                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                onChange={(e) => updateItem(idx, 'item_id', e.target.value)}
+                                {items.map((item, idx) => {
+                                    const catalogItem = catalogItems.find((it: any) => it.id === item.item_id);
+                                    const hasTaxCode = !!(item.tax_code_id || catalogItem?.tax_code_id);
+                                    return (
+                                        <div key={idx} className="flex gap-3 items-end animate-in slide-in-from-top-2 duration-300">
+                                            <div className="flex-1 space-y-1">
+                                                <select
+                                                    value={item.item_id}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                    onChange={(e) => updateItem(idx, 'item_id', e.target.value)}
+                                                >
+                                                    <option value="">Select Item</option>
+                                                    {catalogItems.map(it => <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="w-20 space-y-1">
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    placeholder="Qty"
+                                                    value={item.quantity}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                    onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="w-28 space-y-1">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    placeholder="Unit Price"
+                                                    value={item.unit_price}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                    onChange={(e) => updateItem(idx, 'unit_price', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="w-24 space-y-1">
+                                                {/* Tax rate badge — resolved server-side, show indicator */}
+                                                <div className={`px-3 py-2 rounded-lg text-xs font-bold text-center border ${
+                                                    hasTaxCode
+                                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                                        : 'bg-slate-800/50 text-slate-600 border-slate-700'
+                                                }`}>
+                                                    {hasTaxCode ? 'Tax ✓' : 'No Tax'}
+                                                </div>
+                                            </div>
+                                            <div className="w-36 space-y-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Description"
+                                                    value={item.description}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                    onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItemLine(idx)}
+                                                className="text-red-400 hover:text-red-300 text-lg font-bold px-2 py-1 transition-colors"
+                                                title="Remove item"
                                             >
-                                                <option value="">Select Item</option>
-                                                {catalogItems.map(it => <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>)}
-                                            </select>
+                                                ×
+                                            </button>
                                         </div>
-                                        <div className="w-20 space-y-1">
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                placeholder="Qty"
-                                                value={item.quantity}
-                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="w-28 space-y-1">
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                placeholder="Unit Price"
-                                                value={item.unit_price}
-                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                onChange={(e) => updateItem(idx, 'unit_price', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="w-36 space-y-1">
-                                            <input
-                                                type="text"
-                                                placeholder="Description"
-                                                value={item.description}
-                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeItemLine(idx)}
-                                            className="text-red-400 hover:text-red-300 text-lg font-bold px-2 py-1 transition-colors"
-                                            title="Remove item"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {items.length > 0 && (
                                     <div className="flex justify-end pt-2 border-t border-slate-800">
-                                        <div className="text-right">
-                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-4">Total</span>
-                                            <span className="text-lg font-bold text-slate-100 font-mono">{formatters.formatCurrency(calculateTotal())}</span>
+                                        <div className="text-right space-y-1 min-w-48">
+                                            <div className="flex justify-between items-center gap-6">
+                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Subtotal</span>
+                                                <span className="text-sm font-semibold text-slate-300 font-mono">{formatters.formatCurrency(subtotal)}</span>
+                                            </div>
+                                            {isTaxInclusive ? (
+                                                <div className="flex justify-between items-center gap-6">
+                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tax</span>
+                                                    <span className="text-xs text-slate-500 italic">Inclusive in price</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between items-center gap-6">
+                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tax</span>
+                                                    <span className="text-xs text-amber-400 italic">Resolved on save</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between items-center gap-6 border-t border-slate-700 pt-1">
+                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total</span>
+                                                <span className="text-lg font-bold text-slate-100 font-mono">{formatters.formatCurrency(total)}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}

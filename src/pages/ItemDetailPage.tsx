@@ -18,7 +18,7 @@ import TabNavigation from './item-create/components/TabNavigation';
 import FormSection from './item-create/components/FormSection';
 import BasicInfoTab from './item-create/tabs/BasicInfoTab';
 import MediaTab from './item-create/tabs/MediaTab';
-import PricingTab from './item-create/tabs/PricingTab';
+import PricingTab, { TaxCodeOption } from './item-create/tabs/PricingTab';
 import CategoryTab from './item-create/tabs/CategoryTab';
 import StockTrackingTab from './item-create/tabs/StockTrackingTab';
 import ShippingTab from './item-create/tabs/ShippingTab';
@@ -86,6 +86,7 @@ const ItemDetailPage = () => {
     const [categories, setCategories] = useState<ItemCategory[]>([]);
     const [uoms, setUoms] = useState<Unit[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [taxCodes, setTaxCodes] = useState<TaxCodeOption[]>([]);
     const [showNewUom, setShowNewUom] = useState(false);
     const [newUomName, setNewUomName] = useState('');
     const [newUomAbbr, setNewUomAbbr] = useState('');
@@ -132,13 +133,15 @@ const ItemDetailPage = () => {
 
         // Load settings and warehouses for dropdowns
         try {
-            const [settings, warehouseData] = await Promise.all([
+            const [settings, warehouseData, taxCodeData] = await Promise.all([
                 inventoryService.getSettings(),
                 inventoryService.getLocations(),
+                inventoryService.getTaxCodes().catch(() => []),
             ]);
             setCategories(settings.categories || []);
             setUoms(settings.uoms || []);
             setWarehouses(Array.isArray(warehouseData) ? warehouseData : []);
+            setTaxCodes(taxCodeData);
         } catch { /* non-blocking */ }
     };
 
@@ -268,7 +271,7 @@ const ItemDetailPage = () => {
             case 'media':
                 return <MediaTab image_urls={editForm.image_urls} updateField={updateField} />;
             case 'pricing':
-                return <PricingTab price={editForm.price} cost={editForm.cost} tax_class={editForm.tax_class} hsn_code={editForm.hsn_code} updateField={updateField} currencySymbol={currencySymbol} />;
+                return <PricingTab price={editForm.price} cost={editForm.cost} tax_class={editForm.tax_class} tax_code_id={editForm.tax_code_id} hsn_code={editForm.hsn_code} updateField={updateField} currencySymbol={currencySymbol} taxCodes={taxCodes} />;
             case 'category':
                 return (
                     <CategoryTab
@@ -743,7 +746,16 @@ const ItemDetailPage = () => {
 
                                             <FormSection title="Tax Information">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <ReadOnlyField label="Tax Class" value={item.tax_class} />
+                                                    <ReadOnlyField
+                                                        label="Tax Code"
+                                                        value={
+                                                            (item as any).tax_code_id
+                                                                ? (taxCodes.find(tc => tc.id === (item as any).tax_code_id)
+                                                                    ? `${taxCodes.find(tc => tc.id === (item as any).tax_code_id)!.name} — ${taxCodes.find(tc => tc.id === (item as any).tax_code_id)!.rate}%`
+                                                                    : item.tax_class || (item as any).tax_code_id)
+                                                                : item.tax_class
+                                                        }
+                                                    />
                                                     <ReadOnlyField label="HSN / SAC Code" value={item.hsn_code} />
                                                 </div>
                                             </FormSection>

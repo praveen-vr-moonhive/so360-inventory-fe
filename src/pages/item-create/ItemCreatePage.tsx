@@ -7,7 +7,7 @@ import { TabId, ItemClassification } from '../../types/itemTypes';
 import TabNavigation from './components/TabNavigation';
 import BasicInfoTab from './tabs/BasicInfoTab';
 import MediaTab from './tabs/MediaTab';
-import PricingTab from './tabs/PricingTab';
+import PricingTab, { TaxCodeOption } from './tabs/PricingTab';
 import CategoryTab from './tabs/CategoryTab';
 import StockTrackingTab from './tabs/StockTrackingTab';
 import ShippingTab from './tabs/ShippingTab';
@@ -91,6 +91,7 @@ const ItemCreatePage = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [tabErrors, setTabErrors] = useState<Partial<Record<TabId, boolean>>>({});
+    const [taxCodes, setTaxCodes] = useState<TaxCodeOption[]>([]);
 
     // Inline create states — category
     const [showNewCategory, setShowNewCategory] = useState(false);
@@ -110,13 +111,15 @@ const ItemCreatePage = () => {
 
     const loadSettings = async () => {
         try {
-            const [settings, warehouseData] = await Promise.all([
+            const [settings, warehouseData, taxCodeData] = await Promise.all([
                 inventoryService.getSettings(),
                 inventoryService.getLocations(),
+                inventoryService.getTaxCodes().catch(() => []),
             ]);
             setCategories(settings.categories || []);
             setUoms(settings.uoms || []);
             setWarehouses(Array.isArray(warehouseData) ? warehouseData : []);
+            setTaxCodes(taxCodeData);
         } catch {
             // Settings are optional, don't block the form
         }
@@ -283,9 +286,11 @@ const ItemCreatePage = () => {
                         price={form.price}
                         cost={form.cost}
                         tax_class={form.tax_class}
+                        tax_code_id={form.tax_code_id}
                         hsn_code={form.hsn_code}
                         updateField={updateField}
                         currencySymbol={currencySymbol}
+                        taxCodes={taxCodes}
                     />
                 );
             case 'category':

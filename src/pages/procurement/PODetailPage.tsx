@@ -14,6 +14,9 @@ interface POLine {
     quantity: number;
     unit_price: number;
     received_quantity: number;
+    tax_code_id?: string;
+    tax_rate?: number;
+    tax_amount?: number;
     items?: { name: string; sku: string };
 }
 
@@ -22,6 +25,8 @@ interface PO {
     po_number: string;
     status: string;
     total_amount: number;
+    subtotal_amount?: number;
+    tax_amount?: number;
     created_at: string;
     expected_delivery_date?: string;
     pr_id?: string;
@@ -64,8 +69,18 @@ const PODetailPage = () => {
         }
     };
 
-    const totalAmount = po?.po_lines?.reduce((sum, line) =>
-        sum + (line.quantity * line.unit_price), 0) || po?.total_amount || 0;
+    // Use server-computed totals if available, fall back to line-level computation
+    const subtotalAmount = po?.subtotal_amount != null && po.subtotal_amount > 0
+        ? po.subtotal_amount
+        : po?.po_lines?.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0) || 0;
+
+    const taxAmount = po?.tax_amount != null && po.tax_amount > 0
+        ? po.tax_amount
+        : po?.po_lines?.reduce((sum, line) => sum + (line.tax_amount || 0), 0) || 0;
+
+    const totalAmount = po?.total_amount || (subtotalAmount + taxAmount);
+
+    const hasTax = taxAmount > 0;
 
     const totalReceived = po?.po_lines?.reduce((sum, line) =>
         sum + (line.received_quantity || 0), 0) || 0;
@@ -99,9 +114,22 @@ const PODetailPage = () => {
                 </td>
                 <td style="text-align:center">${line.quantity}</td>
                 <td style="text-align:right">${formatters.formatCurrency(line.unit_price)}</td>
+                <td style="text-align:right">${line.tax_rate ? `${line.tax_rate}%` : '—'}</td>
+                <td style="text-align:right">${line.tax_amount ? formatters.formatCurrency(line.tax_amount) : '—'}</td>
                 <td style="text-align:right"><strong>${formatters.formatCurrency(line.quantity * line.unit_price)}</strong></td>
             </tr>
         `).join('');
+
+        const taxFooterRows = hasTax ? `
+            <tr>
+                <td colspan="6" style="text-align:right;font-weight:600;color:#555">Subtotal:</td>
+                <td style="text-align:right;font-weight:700">${formatters.formatCurrency(subtotalAmount)}</td>
+            </tr>
+            <tr>
+                <td colspan="6" style="text-align:right;font-weight:600;color:#555">Tax:</td>
+                <td style="text-align:right;font-weight:700;color:#b45309">${formatters.formatCurrency(taxAmount)}</td>
+            </tr>
+        ` : '';
 
         printWindow.document.write(`<!DOCTYPE html>
 <html>
@@ -176,13 +204,16 @@ const PODetailPage = () => {
                 <th>Item</th>
                 <th style="text-align:center">Qty</th>
                 <th style="text-align:right">Unit Price</th>
-                <th style="text-align:right">Subtotal</th>
+                <th style="text-align:right">Tax Rate</th>
+                <th style="text-align:right">Tax Amount</th>
+                <th style="text-align:right">Line Total</th>
             </tr>
         </thead>
         <tbody>${linesHtml}</tbody>
         <tfoot>
+            ${taxFooterRows}
             <tr class="total-row">
-                <td colspan="4" style="text-align:right;font-weight:700">Grand Total:</td>
+                <td colspan="6" style="text-align:right;font-weight:700">Grand Total:</td>
                 <td style="text-align:right;font-weight:800;font-size:16px">${formatters.formatCurrency(totalAmount)}</td>
             </tr>
         </tfoot>
@@ -296,15 +327,28 @@ const PODetailPage = () => {
                         </div>
                     </div>
 
-                    {/* Order Total */}
+                    {/* Order Total with Tax Breakdown */}
                     <div className="bg-indigo-600 rounded-2xl p-6 text-white">
                         <span className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider">Order Total</span>
                         <div className="text-4xl font-black mt-2">
                             {formatters.formatCurrency(totalAmount)}
                         </div>
-                        <p className="mt-2 text-sm text-indigo-200">
-                            {po.po_lines?.length || 0} line items
-                        </p>
+                        {hasTax ? (
+                            <div className="mt-3 space-y-1">
+                                <div className="flex justify-between text-sm text-indigo-200">
+                                    <span>Subtotal</span>
+                                    <span>{formatters.formatCurrency(subtotalAmount)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-indigo-200">
+                                    <span>Tax</span>
+                                    <span>{formatters.formatCurrency(taxAmount)}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="mt-2 text-sm text-indigo-200">
+                                {po.po_lines?.length || 0} line items
+                            </p>
+                        )}
                     </div>
 
                     {/* Receiving Progress */}
@@ -351,13 +395,15 @@ const PODetailPage = () => {
                                         <th className="pb-3 text-center">Ordered</th>
                                         <th className="pb-3 text-center">Received</th>
                                         <th className="pb-3 text-right">Unit Price</th>
-                                        <th className="pb-3 text-right">Subtotal</th>
+                                        <th className="pb-3 text-right">Tax</th>
+                                        <th className="pb-3 text-right">Line Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {po.po_lines?.map((line) => {
                                         const isFullyReceived = line.received_quantity >= line.quantity;
                                         const isPartiallyReceived = line.received_quantity > 0 && line.received_quantity < line.quantity;
+                                        const lineTotal = line.quantity * line.unit_price;
 
                                         return (
                                             <tr key={line.id} className="border-b border-slate-800/50">
@@ -379,22 +425,61 @@ const PODetailPage = () => {
                                                 <td className="py-3 text-right text-slate-300">
                                                     {formatters.formatCurrency(line.unit_price)}
                                                 </td>
+                                                <td className="py-3 text-right">
+                                                    {line.tax_rate && line.tax_rate > 0 ? (
+                                                        <div>
+                                                            <span className="text-xs text-amber-400 font-bold">{line.tax_rate}%</span>
+                                                            <span className="block text-xs text-slate-500">{formatters.formatCurrency(line.tax_amount || 0)}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs">—</span>
+                                                    )}
+                                                </td>
                                                 <td className="py-3 text-right font-bold text-white">
-                                                    {formatters.formatCurrency(line.quantity * line.unit_price)}
+                                                    {formatters.formatCurrency(lineTotal)}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="border-t border-slate-700">
-                                        <td colSpan={4} className="py-4 text-right font-bold text-slate-400">
-                                            Grand Total:
-                                        </td>
-                                        <td className="py-4 text-right font-black text-xl text-white">
-                                            {formatters.formatCurrency(totalAmount)}
-                                        </td>
-                                    </tr>
+                                    {hasTax ? (
+                                        <>
+                                            <tr className="border-t border-slate-700">
+                                                <td colSpan={5} className="py-2 text-right text-slate-400 text-sm">
+                                                    Subtotal:
+                                                </td>
+                                                <td className="py-2 text-right font-semibold text-slate-300">
+                                                    {formatters.formatCurrency(subtotalAmount)}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colSpan={5} className="py-2 text-right text-amber-400 text-sm font-semibold">
+                                                    Tax:
+                                                </td>
+                                                <td className="py-2 text-right font-semibold text-amber-400">
+                                                    {formatters.formatCurrency(taxAmount)}
+                                                </td>
+                                            </tr>
+                                            <tr className="border-t border-slate-600">
+                                                <td colSpan={5} className="py-4 text-right font-bold text-slate-400">
+                                                    Grand Total:
+                                                </td>
+                                                <td className="py-4 text-right font-black text-xl text-white">
+                                                    {formatters.formatCurrency(totalAmount)}
+                                                </td>
+                                            </tr>
+                                        </>
+                                    ) : (
+                                        <tr className="border-t border-slate-700">
+                                            <td colSpan={5} className="py-4 text-right font-bold text-slate-400">
+                                                Grand Total:
+                                            </td>
+                                            <td className="py-4 text-right font-black text-xl text-white">
+                                                {formatters.formatCurrency(totalAmount)}
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tfoot>
                             </table>
                         </div>

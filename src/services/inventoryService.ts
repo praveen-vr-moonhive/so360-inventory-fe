@@ -275,6 +275,31 @@ class InventoryService {
         return response.json();
     }
 
+    // ==================== Tax Codes (Core Backend) ====================
+
+    /**
+     * Fetch all active tax codes from Core Backend for the current org.
+     * Endpoint: GET /v1/financials/tax-codes/:orgId
+     */
+    async getTaxCodes(): Promise<{ id: string; name: string; code?: string; rate: number; jurisdiction?: string }[]> {
+        if (!this.orgId) throw new Error('OrgId not set');
+        const response = await fetch(`${this.coreOrigin}/v1/financials/tax-codes/${this.orgId}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.accessToken}`,
+                'X-Tenant-Id': this.tenantId || '',
+                'X-Org-Id': this.orgId || '',
+            },
+        });
+        if (!response.ok) {
+            console.warn('Could not fetch tax codes from Core API');
+            return [];
+        }
+        const result = await response.json();
+        // Core API may return array or { data: [...] }
+        return Array.isArray(result) ? result : (result.data || []);
+    }
+
     // ==================== Business Settings (Core Backend) ====================
 
     async getBusinessSettings() {

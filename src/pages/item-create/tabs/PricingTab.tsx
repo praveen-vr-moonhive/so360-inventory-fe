@@ -1,19 +1,31 @@
 import React from 'react';
 import FormSection from '../components/FormSection';
 
+export interface TaxCodeOption {
+    id: string;
+    name: string;
+    code?: string;
+    rate: number;
+    jurisdiction?: string;
+}
+
 interface PricingTabProps {
     price: string;
     cost: string;
     tax_class: string;
+    tax_code_id: string;
     hsn_code: string;
     updateField: (field: string, value: any) => void;
     currencySymbol?: string;
+    taxCodes?: TaxCodeOption[];
 }
 
 const inputClass = 'w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-600';
 const labelClass = 'block text-sm font-medium text-slate-400 mb-1.5';
 
-const PricingTab: React.FC<PricingTabProps> = ({ price, cost, tax_class, hsn_code, updateField, currencySymbol = '$' }) => {
+const PricingTab: React.FC<PricingTabProps> = ({
+    price, cost, tax_class, tax_code_id, hsn_code, updateField, currencySymbol = '$', taxCodes = []
+}) => {
     return (
         <div className="space-y-8">
             <FormSection title="Pricing">
@@ -58,14 +70,39 @@ const PricingTab: React.FC<PricingTabProps> = ({ price, cost, tax_class, hsn_cod
             <FormSection title="Tax Information">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className={labelClass}>Tax Class</label>
-                        <input
-                            type="text"
-                            value={tax_class}
-                            onChange={e => updateField('tax_class', e.target.value)}
-                            className={inputClass}
-                            placeholder="e.g. Standard, Reduced, Zero-rated"
-                        />
+                        <label className={labelClass}>Tax Code</label>
+                        {taxCodes.length > 0 ? (
+                            <select
+                                value={tax_code_id}
+                                onChange={e => updateField('tax_code_id', e.target.value)}
+                                className={inputClass}
+                            >
+                                <option value="">— No Tax —</option>
+                                {taxCodes.map(tc => (
+                                    <option key={tc.id} value={tc.id}>
+                                        {tc.name}{tc.code ? ` (${tc.code})` : ''} — {tc.rate}%
+                                        {tc.jurisdiction ? ` · ${tc.jurisdiction}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input
+                                type="text"
+                                value={tax_class}
+                                onChange={e => updateField('tax_class', e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. Standard, Reduced, Zero-rated"
+                            />
+                        )}
+                        {taxCodes.length === 0 && (
+                            <p className="text-xs text-slate-600 mt-1">No tax codes configured. Add tax codes in Settings → Financial → Tax Codes.</p>
+                        )}
+                        {tax_code_id && taxCodes.length > 0 && (() => {
+                            const selected = taxCodes.find(tc => tc.id === tax_code_id);
+                            return selected ? (
+                                <p className="text-xs text-amber-400 mt-1">Rate: {selected.rate}% applied to purchase orders</p>
+                            ) : null;
+                        })()}
                     </div>
                     <div>
                         <label className={labelClass}>HSN / SAC Code</label>
