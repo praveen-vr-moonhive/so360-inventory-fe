@@ -24,6 +24,7 @@ export default defineConfig({
                 '@so360/shell-context': { singleton: true },
                 '@so360/design-system': { singleton: true },
                 '@so360/event-bus': { singleton: true },
+                '@so360/formatters': { singleton: true },
             },
         }),
     ],
@@ -34,6 +35,7 @@ export default defineConfig({
     },
     server: {
         port: 3005,
+        strictPort: true,
         cors: true,
         proxy: {
             '/v1/inventory': {
@@ -66,6 +68,7 @@ export default defineConfig({
 
     preview: {
         port: 3005,
+        strictPort: true,
         cors: true,
         proxy: {
             '/v1/inventory': {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { inventoryService } from '../../services/inventoryService';
-import { Unit, ItemCategory } from '../../types/inventory';
+import { Unit, ItemCategory, Warehouse } from '../../types/inventory';
 import { TabId, ItemClassification } from '../../types/itemTypes';
 import TabNavigation from './components/TabNavigation';
 import BasicInfoTab from './tabs/BasicInfoTab';
@@ -12,6 +12,7 @@ import CategoryTab from './tabs/CategoryTab';
 import StockTrackingTab from './tabs/StockTrackingTab';
 import ShippingTab from './tabs/ShippingTab';
 import AttributesTab from './tabs/AttributesTab';
+import { useInventoryCurrencySymbol } from '../../utils/formatters';
 
 interface FormData {
     name: string;
@@ -40,6 +41,10 @@ interface FormData {
     hsn_code: string;
     product_type_id: string;
     custom_attributes: Record<string, any>;
+    cost_center_id: string;
+    default_warehouse_id: string;
+    is_online_visible: boolean;
+    tax_code_id: string;
 }
 
 const initialFormData: FormData = {
@@ -69,14 +74,20 @@ const initialFormData: FormData = {
     hsn_code: '',
     product_type_id: '',
     custom_attributes: {},
+    cost_center_id: '',
+    default_warehouse_id: '',
+    is_online_visible: false,
+    tax_code_id: '',
 };
 
 const ItemCreatePage = () => {
     const navigate = useNavigate();
+    const currencySymbol = useInventoryCurrencySymbol();
     const [form, setForm] = useState<FormData>(initialFormData);
     const [activeTab, setActiveTab] = useState<TabId>('basic');
     const [categories, setCategories] = useState<ItemCategory[]>([]);
     const [uoms, setUoms] = useState<Unit[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [tabErrors, setTabErrors] = useState<Partial<Record<TabId, boolean>>>({});
@@ -99,9 +110,13 @@ const ItemCreatePage = () => {
 
     const loadSettings = async () => {
         try {
-            const settings = await inventoryService.getSettings();
+            const [settings, warehouseData] = await Promise.all([
+                inventoryService.getSettings(),
+                inventoryService.getLocations(),
+            ]);
             setCategories(settings.categories || []);
             setUoms(settings.uoms || []);
+            setWarehouses(Array.isArray(warehouseData) ? warehouseData : []);
         } catch {
             // Settings are optional, don't block the form
         }
@@ -204,6 +219,10 @@ const ItemCreatePage = () => {
             if (form.hsn_code.trim()) dto.hsn_code = form.hsn_code.trim();
             if (form.product_type_id) dto.product_type_id = form.product_type_id;
             if (Object.keys(form.custom_attributes).length > 0) dto.custom_attributes = form.custom_attributes;
+            if (form.cost_center_id) dto.cost_center_id = form.cost_center_id;
+            if (form.default_warehouse_id) dto.default_warehouse_id = form.default_warehouse_id;
+            if (form.is_online_visible) dto.is_online_visible = form.is_online_visible;
+            if (form.tax_code_id) dto.tax_code_id = form.tax_code_id;
 
             const hasLength = form.dimensions_length;
             const hasWidth = form.dimensions_width;
@@ -266,6 +285,7 @@ const ItemCreatePage = () => {
                         tax_class={form.tax_class}
                         hsn_code={form.hsn_code}
                         updateField={updateField}
+                        currencySymbol={currencySymbol}
                     />
                 );
             case 'category':
@@ -294,6 +314,9 @@ const ItemCreatePage = () => {
                         is_serial_tracked={form.is_serial_tracked}
                         is_active={form.is_active}
                         updateField={updateField}
+                        default_warehouse_id={form.default_warehouse_id}
+                        warehouses={warehouses}
+                        is_online_visible={form.is_online_visible}
                     />
                 );
             case 'shipping':

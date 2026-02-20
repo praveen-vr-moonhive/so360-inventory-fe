@@ -112,7 +112,7 @@ const ProductTypeSettingsPage = () => {
     if (loading) return <div className="p-8"><div className="animate-pulse text-slate-500">Loading product types...</div></div>;
 
     return (
-        <div className="p-8 max-w-5xl mx-auto">
+        <div className="p-8">
             <header className="mb-8">
                 <button onClick={() => navigate('/inventory/settings')} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4">
                     <ArrowLeft size={18} /> <span className="text-sm">Back to Settings</span>

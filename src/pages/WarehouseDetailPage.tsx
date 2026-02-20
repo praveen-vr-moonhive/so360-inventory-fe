@@ -172,7 +172,7 @@ const WarehouseDetailPage = () => {
     const deletingLocation = warehouse.warehouse_locations?.find((l: any) => l.id === deletingLocationId);
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
+        <div className="p-8">
             {error && (
                 <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center justify-between">
                     <div className="flex items-center gap-2 text-rose-400 text-sm">

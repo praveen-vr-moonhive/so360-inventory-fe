@@ -116,7 +116,7 @@ const VendorListPage = () => {
     );
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
+        <div className="p-8 space-y-8 animate-in fade-in duration-700">
             {/* Header */}
             <div className="flex justify-between items-end">
                 <div>

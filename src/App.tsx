@@ -10,7 +10,6 @@ const WarehouseDetailPage = lazy(() => import('./pages/WarehouseDetailPage'));
 const StockOverviewPage = lazy(() => import('./pages/StockOverviewPage'));
 const StockAdjustmentsPage = lazy(() => import('./pages/StockAdjustmentsPage'));
 const StockTransfersPage = lazy(() => import('./pages/StockTransfersPage'));
-const MovementsPage = lazy(() => import('./pages/MovementsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ProductTypeSettingsPage = lazy(() => import('./pages/settings/ProductTypeSettingsPage'));
 const PRListPage = lazy(() => import('./pages/procurement/PRListPage'));
@@ -109,7 +108,6 @@ const App = () => {
                 <Route path="locations" element={<StockLocationsPage />} />
                 <Route path="warehouses/:id" element={<WarehouseDetailPage />} />
                 <Route path="overview" element={<StockOverviewPage />} />
-                <Route path="movements" element={<MovementsPage />} />
                 <Route path="adjustments" element={<StockAdjustmentsPage />} />
                 <Route path="transfers" element={<StockTransfersPage />} />
                 <Route path="settings" element={<SettingsPage />} />

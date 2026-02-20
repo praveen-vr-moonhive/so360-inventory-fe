@@ -3,10 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { procurementService } from '../../services/procurementService';
 import { vendorService } from '../../services/vendorService';
 import { inventoryService } from '../../services/inventoryService';
+import { useBusinessSettings } from '@so360/shell-context';
+import { useInventoryFormatters } from '../../utils/formatters';
 
 const POListPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { settings } = useBusinessSettings();
+    const formatters = useInventoryFormatters();
     const [pos, setPos] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -15,7 +19,7 @@ const POListPage = () => {
     const [allPrs, setAllPrs] = useState<any[]>([]);
     const [formData, setFormData] = useState({
         vendor_id: '', po_number: '', pr_id: '',
-        terms: '', shipping_address: '', currency: 'USD',
+        terms: '', shipping_address: '', currency: settings?.base_currency || 'USD',
     });
     const [items, setItems] = useState<any[]>([]);
     const [catalogItems, setCatalogItems] = useState<any[]>([]);
@@ -109,7 +113,7 @@ const POListPage = () => {
     const openNewPOForm = () => {
         setFormData({
             vendor_id: '', po_number: generatePONumber(), pr_id: '',
-            terms: '', shipping_address: '', currency: 'USD',
+            terms: '', shipping_address: '', currency: settings?.base_currency || 'USD',
         });
         setItems([]);
         setShowForm(true);
@@ -179,7 +183,7 @@ const POListPage = () => {
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
+        <div className="p-8 space-y-8 animate-in fade-in duration-700">
             <div className="flex justify-between items-end">
                 <div>
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
@@ -271,7 +275,7 @@ const POListPage = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-5 font-mono text-sm font-bold text-slate-100">
-                                        ${parseFloat(po.total_amount || 0).toLocaleString()}
+                                        {formatters.formatCurrency(parseFloat(po.total_amount || 0))}
                                     </td>
                                     <td className="px-6 py-5 w-48">
                                         <div className="flex items-center gap-3">
@@ -488,7 +492,7 @@ const POListPage = () => {
                                     <div className="flex justify-end pt-2 border-t border-slate-800">
                                         <div className="text-right">
                                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-4">Total</span>
-                                            <span className="text-lg font-bold text-slate-100 font-mono">${calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="text-lg font-bold text-slate-100 font-mono">{formatters.formatCurrency(calculateTotal())}</span>
                                         </div>
                                     </div>
                                 )}

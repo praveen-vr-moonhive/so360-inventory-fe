@@ -127,7 +127,7 @@ const SettingsPage = () => {
     if (isLoading) return <div className="p-8"><div className="animate-pulse text-slate-500">Loading settings...</div></div>;
 
     return (
-        <div className="p-8 max-w-4xl mx-auto">
+        <div className="p-8">
             <header className="mb-8">
                 <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
                     <Settings className="text-slate-400" /> Inventory Settings

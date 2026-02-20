@@ -9,7 +9,7 @@ import {
     Image as ImageIcon, Tag, X, BarChart3
 } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
-import { Item, StockMovement, Unit, ItemCategory } from '../types/inventory';
+import { Item, StockMovement, Unit, ItemCategory, Warehouse } from '../types/inventory';
 import { TabId, ITEM_CLASSIFICATIONS, ItemClassification } from '../types/itemTypes';
 import { Table } from '../components/common/Table';
 import { TableSkeleton } from '../components/common/Skeleton';
@@ -23,6 +23,8 @@ import CategoryTab from './item-create/tabs/CategoryTab';
 import StockTrackingTab from './item-create/tabs/StockTrackingTab';
 import ShippingTab from './item-create/tabs/ShippingTab';
 import AttributesTab from './item-create/tabs/AttributesTab';
+import LifecycleStatusPanel from '../components/lifecycle/LifecycleStatusPanel';
+import { useInventoryFormatters, useInventoryCurrencySymbol } from '../utils/formatters';
 
 // ── Types ─────────────────────────────────────────────
 type ViewTabId = TabId | 'ledger';
@@ -54,6 +56,10 @@ interface EditFormData {
     hsn_code: string;
     product_type_id: string;
     custom_attributes: Record<string, any>;
+    cost_center_id: string;
+    default_warehouse_id: string;
+    is_online_visible: boolean;
+    tax_code_id: string;
 }
 
 // ── Main Component ────────────────────────────────────
@@ -61,6 +67,8 @@ const ItemDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { can } = useAuth();
+    const formatters = useInventoryFormatters();
+    const currencySymbol = useInventoryCurrencySymbol();
     const [item, setItem] = useState<Item | null>(null);
     const [ledger, setLedger] = useState<StockMovement[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +85,7 @@ const ItemDetailPage = () => {
     // Edit settings
     const [categories, setCategories] = useState<ItemCategory[]>([]);
     const [uoms, setUoms] = useState<Unit[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [showNewUom, setShowNewUom] = useState(false);
     const [newUomName, setNewUomName] = useState('');
     const [newUomAbbr, setNewUomAbbr] = useState('');
@@ -121,11 +130,15 @@ const ItemDetailPage = () => {
         setTabErrors({});
         setIsEditing(true);
 
-        // Load settings for dropdowns
+        // Load settings and warehouses for dropdowns
         try {
-            const settings = await inventoryService.getSettings();
+            const [settings, warehouseData] = await Promise.all([
+                inventoryService.getSettings(),
+                inventoryService.getLocations(),
+            ]);
             setCategories(settings.categories || []);
             setUoms(settings.uoms || []);
+            setWarehouses(Array.isArray(warehouseData) ? warehouseData : []);
         } catch { /* non-blocking */ }
     };
 
@@ -193,6 +206,10 @@ const ItemDetailPage = () => {
             if (editForm.hsn_code.trim()) dto.hsn_code = editForm.hsn_code.trim(); else dto.hsn_code = null;
             if (editForm.product_type_id) dto.product_type_id = editForm.product_type_id; else dto.product_type_id = null;
             if (Object.keys(editForm.custom_attributes).length > 0) dto.custom_attributes = editForm.custom_attributes; else dto.custom_attributes = null;
+            if (editForm.cost_center_id) dto.cost_center_id = editForm.cost_center_id; else dto.cost_center_id = null;
+            if (editForm.default_warehouse_id) dto.default_warehouse_id = editForm.default_warehouse_id; else dto.default_warehouse_id = null;
+            dto.is_online_visible = editForm.is_online_visible;
+            if (editForm.tax_code_id) dto.tax_code_id = editForm.tax_code_id; else dto.tax_code_id = null;
 
             const hasLength = editForm.dimensions_length;
             const hasWidth = editForm.dimensions_width;
@@ -251,7 +268,7 @@ const ItemDetailPage = () => {
             case 'media':
                 return <MediaTab image_urls={editForm.image_urls} updateField={updateField} />;
             case 'pricing':
-                return <PricingTab price={editForm.price} cost={editForm.cost} tax_class={editForm.tax_class} hsn_code={editForm.hsn_code} updateField={updateField} />;
+                return <PricingTab price={editForm.price} cost={editForm.cost} tax_class={editForm.tax_class} hsn_code={editForm.hsn_code} updateField={updateField} currencySymbol={currencySymbol} />;
             case 'category':
                 return (
                     <CategoryTab
@@ -273,6 +290,9 @@ const ItemDetailPage = () => {
                         min_stock_threshold={editForm.min_stock_threshold} reorder_level={editForm.reorder_level}
                         is_batch_tracked={editForm.is_batch_tracked} is_serial_tracked={editForm.is_serial_tracked}
                         is_active={editForm.is_active} updateField={updateField}
+                        default_warehouse_id={editForm.default_warehouse_id}
+                        warehouses={warehouses}
+                        is_online_visible={editForm.is_online_visible}
                     />
                 );
             case 'shipping':
@@ -560,6 +580,15 @@ const ItemDetailPage = () => {
                                 )}
                             </div>
                         ) : null}
+
+                        {/* Section D: Product Lifecycle */}
+                        <LifecycleStatusPanel
+                            itemId={item.id}
+                            productStatus={item.product_status || 'draft'}
+                            onStatusChange={(newStatus) => {
+                                setItem(prev => prev ? { ...prev, product_status: newStatus } : prev);
+                            }}
+                        />
                     </div>
 
                     {/* ═══ RIGHT COLUMN ═══ */}
@@ -699,8 +728,8 @@ const ItemDetailPage = () => {
                                         <div className="space-y-8">
                                             <FormSection title="Pricing">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <ReadOnlyField label="Selling Price ($)" value={item.price != null ? Number(item.price).toLocaleString(undefined, { minimumFractionDigits: 2 }) : null} />
-                                                    <ReadOnlyField label="Cost Price ($)" value={item.cost != null ? Number(item.cost).toLocaleString(undefined, { minimumFractionDigits: 2 }) : null} />
+                                                    <ReadOnlyField label={`Selling Price (${currencySymbol})`} value={item.price != null ? formatters.formatCurrency(Number(item.price)) : null} />
+                                                    <ReadOnlyField label={`Cost Price (${currencySymbol})`} value={item.cost != null ? formatters.formatCurrency(Number(item.cost)) : null} />
                                                 </div>
                                                 {margin && (
                                                     <div className="mt-4 p-3 bg-slate-800/50 border border-slate-700/50 rounded-lg">
@@ -935,6 +964,10 @@ function initEditForm(item: Item): EditFormData {
         hsn_code: item.hsn_code || '',
         product_type_id: item.product_type_id || '',
         custom_attributes: item.custom_attributes || {},
+        cost_center_id: item.cost_center_id || '',
+        default_warehouse_id: item.default_warehouse_id || '',
+        is_online_visible: item.is_online_visible || false,
+        tax_code_id: item.tax_code_id || '',
     };
 }
 

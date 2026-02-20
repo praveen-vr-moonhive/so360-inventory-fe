@@ -54,6 +54,12 @@ export interface Item {
             sort_order: number;
         }>;
     };
+    cost_center_id?: string;
+    default_warehouse_id?: string;
+    is_online_visible?: boolean;
+    lifecycle_flow_instance_id?: string;
+    tax_code_id?: string;
+    product_status?: string;
     created_at?: string;
     updated_at?: string;
 }

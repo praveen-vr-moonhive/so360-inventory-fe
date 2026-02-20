@@ -7,18 +7,19 @@ interface PricingTabProps {
     tax_class: string;
     hsn_code: string;
     updateField: (field: string, value: any) => void;
+    currencySymbol?: string;
 }
 
 const inputClass = 'w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-slate-600';
 const labelClass = 'block text-sm font-medium text-slate-400 mb-1.5';
 
-const PricingTab: React.FC<PricingTabProps> = ({ price, cost, tax_class, hsn_code, updateField }) => {
+const PricingTab: React.FC<PricingTabProps> = ({ price, cost, tax_class, hsn_code, updateField, currencySymbol = '$' }) => {
     return (
         <div className="space-y-8">
             <FormSection title="Pricing">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className={labelClass}>Selling Price ($)</label>
+                        <label className={labelClass}>Selling Price ({currencySymbol})</label>
                         <input
                             type="number"
                             step="0.01"
@@ -30,7 +31,7 @@ const PricingTab: React.FC<PricingTabProps> = ({ price, cost, tax_class, hsn_cod
                         />
                     </div>
                     <div>
-                        <label className={labelClass}>Cost Price ($)</label>
+                        <label className={labelClass}>Cost Price ({currencySymbol})</label>
                         <input
                             type="number"
                             step="0.01"

@@ -10,7 +10,8 @@ class ProcurementService {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${(inventoryService as any).accessToken}`,
-                'x-org-id': orgId || '',
+                'X-Tenant-Id': (inventoryService as any).tenantId || '',
+                'X-Org-Id': orgId || '',
                 ...options.headers,
             },
         });
@@ -87,7 +88,7 @@ class ProcurementService {
     }
 
     async getGRNDetail(id: string) {
-        return this.request(`/grn/detail/${id}`);
+        return this.request(`/grn/${id}`);
     }
 
     // Vendor Invoices

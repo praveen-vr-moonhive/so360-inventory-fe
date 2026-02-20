@@ -10,12 +10,14 @@ class VendorService {
 
     private async request(endpoint: string, options: RequestInit = {}) {
         const orgId = inventoryService.getOrgId();
+        const tenantId = (inventoryService as any).tenantId;
         const response = await fetch(`${this.baseUrl}${endpoint}`, {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${(inventoryService as any).accessToken}`,
-                'x-org-id': orgId || '',
+                'X-Tenant-Id': tenantId || '',
+                'X-Org-Id': orgId || '',
                 'x-user-id': this.userId || '',
                 ...options.headers,
             },

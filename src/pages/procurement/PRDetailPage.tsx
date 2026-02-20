@@ -219,7 +219,7 @@ const PRDetailPage = () => {
     }
 
     return (
-        <div className="p-8 max-w-6xl mx-auto">
+        <div className="p-8">
             <button
                 onClick={() => navigate('/procurement/pr')}
                 className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors group"

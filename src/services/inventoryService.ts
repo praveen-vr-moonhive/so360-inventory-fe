@@ -344,6 +344,23 @@ class InventoryService {
         const query = itemId ? `?item_id=${itemId}` : '';
         return this.request(`/transfers/${this.orgId}${query}`);
     }
+
+    // ==================== Product Lifecycle ====================
+
+    async getOnlineProducts() {
+        return this.request(`/items/${this.orgId}/online`);
+    }
+
+    async transitionLifecycle(itemId: string, transitionCode: string, comment?: string) {
+        return this.request(`/items/${itemId}/lifecycle/transition`, {
+            method: 'POST',
+            body: JSON.stringify({ transition_code: transitionCode, comment }),
+        });
+    }
+
+    async getLifecycleGates(itemId: string) {
+        return this.request(`/items/${itemId}/lifecycle/gates`);
+    }
 }
 
 export const inventoryService = new InventoryService();

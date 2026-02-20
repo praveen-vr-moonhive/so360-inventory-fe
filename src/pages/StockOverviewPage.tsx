@@ -3,20 +3,12 @@ import { Search, MapPin, Clock, AlertTriangle, Box, X, RefreshCcw } from 'lucide
 import { inventoryService } from '../services/inventoryService';
 import { StockBalance } from '../types/inventory';
 import { Table } from '../components/common/Table';
+import { useInventoryFormatters } from '../utils/formatters';
 
 const PAGE_SIZE = 25;
 
-const getCurrencySymbol = (code: string): string => {
-    try {
-        return new Intl.NumberFormat('en', { style: 'currency', currency: code })
-            .formatToParts(0)
-            .find(p => p.type === 'currency')?.value || code;
-    } catch {
-        return code;
-    }
-};
-
 const StockOverviewPage = () => {
+    const formatters = useInventoryFormatters();
     const [stockLevels, setStockLevels] = useState<StockBalance[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -24,28 +16,16 @@ const StockOverviewPage = () => {
     const [lowStockFilter, setLowStockFilter] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const [currencySymbol, setCurrencySymbol] = useState('$');
 
     const fetchStock = async () => {
         setIsLoading(true);
         setError(null);
         try {
-            const [stockResult, settingsResult] = await Promise.allSettled([
-                inventoryService.getStockOverview(),
-                inventoryService.getBusinessSettings(),
-            ]);
-
-            if (stockResult.status === 'fulfilled') {
-                setStockLevels(stockResult.value);
-            } else {
-                console.error('Failed to fetch stock levels', stockResult.reason);
-                setError('Failed to load stock data. Please try again.');
-            }
-
-            if (settingsResult.status === 'fulfilled') {
-                const currency = settingsResult.value?.base_currency || 'USD';
-                setCurrencySymbol(getCurrencySymbol(currency));
-            }
+            const stockLevelsData = await inventoryService.getStockOverview();
+            setStockLevels(stockLevelsData);
+        } catch (err) {
+            console.error('Failed to fetch stock levels', err);
+            setError('Failed to load stock data. Please try again.');
         } finally {
             setIsLoading(false);
         }
@@ -133,7 +113,7 @@ const StockOverviewPage = () => {
             header: 'Value (FIFO/W.Avg)',
             accessor: (sl: StockBalance) => (
                 <span className="text-slate-300 font-mono text-sm">
-                    {currencySymbol}{(sl.valuation || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatters.formatCurrency(sl.valuation || 0)}
                 </span>
             )
         },
@@ -149,7 +129,7 @@ const StockOverviewPage = () => {
     ];
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
+        <div className="p-8">
             {error && (
                 <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-3 rounded-lg text-sm flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
@@ -184,7 +164,7 @@ const StockOverviewPage = () => {
                 <div className="bg-slate-900/40 border border-slate-800/50 p-4 rounded-xl">
                     <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total Value</span>
                     <div className="text-xl font-bold text-blue-400 mt-0.5">
-                        {currencySymbol}{stockLevels.reduce((sum, sl) => sum + (sl.valuation || 0), 0).toLocaleString()}
+                        {formatters.formatCurrency(stockLevels.reduce((sum, sl) => sum + (sl.valuation || 0), 0))}
                     </div>
                 </div>
                 <div className="bg-slate-900/40 border border-slate-800/50 p-4 rounded-xl">

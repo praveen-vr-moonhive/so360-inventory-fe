@@ -5,6 +5,7 @@ import {
     XCircle, Package, User, Calendar, Loader2, Truck, Building2
 } from 'lucide-react';
 import { procurementService } from '../../services/procurementService';
+import { useInventoryFormatters } from '../../utils/formatters';
 
 interface POLine {
     id: string;
@@ -31,6 +32,7 @@ interface PO {
 const PODetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const formatters = useInventoryFormatters();
     const [po, setPo] = useState<PO | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ const PODetailPage = () => {
     }
 
     return (
-        <div className="p-8 max-w-6xl mx-auto">
+        <div className="p-8">
             <button
                 onClick={() => navigate('/procurement/po')}
                 className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors group"
@@ -175,7 +177,7 @@ const PODetailPage = () => {
                     <div className="bg-indigo-600 rounded-2xl p-6 text-white">
                         <span className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider">Order Total</span>
                         <div className="text-4xl font-black mt-2">
-                            ${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {formatters.formatCurrency(totalAmount)}
                         </div>
                         <p className="mt-2 text-sm text-indigo-200">
                             {po.po_lines?.length || 0} line items
@@ -252,10 +254,10 @@ const PODetailPage = () => {
                                                     )}
                                                 </td>
                                                 <td className="py-3 text-right text-slate-300">
-                                                    ${line.unit_price.toFixed(2)}
+                                                    {formatters.formatCurrency(line.unit_price)}
                                                 </td>
                                                 <td className="py-3 text-right font-bold text-white">
-                                                    ${(line.quantity * line.unit_price).toFixed(2)}
+                                                    {formatters.formatCurrency(line.quantity * line.unit_price)}
                                                 </td>
                                             </tr>
                                         );
@@ -267,7 +269,7 @@ const PODetailPage = () => {
                                             Grand Total:
                                         </td>
                                         <td className="py-4 text-right font-black text-xl text-white">
-                                            ${totalAmount.toFixed(2)}
+                                            {formatters.formatCurrency(totalAmount)}
                                         </td>
                                     </tr>
                                 </tfoot>
