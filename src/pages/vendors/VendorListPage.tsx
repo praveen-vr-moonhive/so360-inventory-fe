@@ -118,7 +118,7 @@ const VendorListPage = () => {
     return (
         <div className="p-8 space-y-8 animate-in fade-in duration-700">
             {/* Header */}
-            <div className="flex justify-between items-end">
+            <div className="flex items-center justify-between gap-4">
                 <div>
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
                         Vendors & Subcontractors

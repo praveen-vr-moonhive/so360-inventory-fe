@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { procurementService } from '../../services/procurementService';
 import { vendorService } from '../../services/vendorService';
-import { inventoryService } from '../../services/inventoryService';
 import { useBusinessSettings } from '@so360/shell-context';
 import { useInventoryFormatters } from '../../utils/formatters';
+import ItemSearchSelector from '../../components/ItemSearchSelector';
 
 const POListPage = () => {
     const navigate = useNavigate();
@@ -22,12 +22,10 @@ const POListPage = () => {
         terms: '', shipping_address: '', currency: settings?.base_currency || 'USD',
     });
     const [items, setItems] = useState<any[]>([]);
-    const [catalogItems, setCatalogItems] = useState<any[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         fetchData();
-        loadCatalog();
     }, []);
 
     // Detect navigation state from PRDetailPage conversion
@@ -45,10 +43,12 @@ const POListPage = () => {
                 .filter((line: any) => line.remaining_quantity > 0)
                 .map((line: any) => ({
                     item_id: line.item_id,
+                    _selectedName: line.item_name || '',
                     quantity: line.remaining_quantity,
                     unit_price: line.estimated_unit_price,
                     description: line.description || '',
                     pr_line_id: line.pr_line_id,
+                    tax_code_id: line.tax_code_id || null,
                     tax_rate: 0,
                     tax_amount: 0,
                 }));
@@ -61,30 +61,31 @@ const POListPage = () => {
 
     const fetchData = async () => {
         try {
-            const [poData, vendorData, prData] = await Promise.all([
+            const [poData, vendorData] = await Promise.all([
                 procurementService.getPOs(),
                 vendorService.getVendors(),
-                procurementService.getPRs()
             ]);
-            setPos(poData);
-            setVendors(vendorData);
-            setAllPrs(prData);
-            setApprovedPrs(prData.filter((p: any) =>
-                ['approved', 'partially_converted', 'converted_to_po'].includes(p.status)
-            ));
+            setPos(Array.isArray(poData) ? poData : (poData?.data || []));
+            setVendors(Array.isArray(vendorData) ? vendorData : (vendorData?.data || []));
         } catch (error) {
-            console.error('Failed to fetch POs', error);
+            console.error('Failed to fetch POs/vendors', error);
         } finally {
             setLoading(false);
         }
+        // PRs loaded independently so a failure doesn't block the PO list
+        loadPRs();
     };
 
-    const loadCatalog = async () => {
+    const loadPRs = async () => {
         try {
-            const data = await inventoryService.getItems();
-            setCatalogItems(data.data || []);
+            const prData = await procurementService.getPRs();
+            const prArray = Array.isArray(prData) ? prData : (prData?.data || []);
+            setAllPrs(prArray);
+            setApprovedPrs(prArray.filter((p: any) =>
+                ['approved', 'partially_converted', 'converted_to_po'].includes(p.status)
+            ));
         } catch (error) {
-            console.error('Failed to load catalog', error);
+            console.error('Failed to fetch PRs', error);
         }
     };
 
@@ -95,28 +96,26 @@ const POListPage = () => {
     };
 
     const addItemLine = () => {
-        setItems([...items, { item_id: '', quantity: 1, unit_price: 0, description: '', tax_rate: 0, tax_amount: 0 }]);
+        setItems([...items, { item_id: '', _selectedName: '', quantity: 1, unit_price: 0, description: '', tax_code_id: null, tax_rate: 0, tax_amount: 0 }]);
     };
 
     const updateItem = (index: number, field: string, value: any) => {
         const newItems = [...items];
         newItems[index][field] = value;
+        setItems(newItems);
+    };
 
-        // When item is selected, auto-populate tax rate from catalog
-        if (field === 'item_id') {
-            const catalogItem = catalogItems.find((it: any) => it.id === value);
-            if (catalogItem?.tax_code_id) {
-                // tax_rate will be resolved server-side; show placeholder as 0 here
-                newItems[index].tax_code_id = catalogItem.tax_code_id;
-                newItems[index].tax_rate = 0;
-                newItems[index].tax_amount = 0;
-            } else {
-                newItems[index].tax_code_id = null;
-                newItems[index].tax_rate = 0;
-                newItems[index].tax_amount = 0;
-            }
-        }
-
+    const updateItemWithProduct = (index: number, selected: { id: string; name: string; sku: string; price?: number; tax_code_id?: string }) => {
+        const newItems = [...items];
+        newItems[index] = {
+            ...newItems[index],
+            item_id: selected.id,
+            _selectedName: `${selected.name} (${selected.sku})`,
+            unit_price: selected.price ?? 0,
+            tax_code_id: selected.tax_code_id || null,
+            tax_rate: 0,
+            tax_amount: 0,
+        };
         setItems(newItems);
     };
 
@@ -129,7 +128,6 @@ const POListPage = () => {
     const calculateTotals = () => {
         const subtotal = items.reduce((sum, item) =>
             sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0), 0);
-        // Tax is resolved server-side; frontend shows 0 until PO is saved
         const taxTotal = items.reduce((sum, item) => sum + (parseFloat(item.tax_amount) || 0), 0);
         const total = isTaxInclusive ? subtotal : subtotal + taxTotal;
         return { subtotal, taxTotal, total };
@@ -141,6 +139,7 @@ const POListPage = () => {
             terms: '', shipping_address: '', currency: settings?.base_currency || 'USD',
         });
         setItems([]);
+        loadPRs(); // refresh PRs when form opens so newly-approved PRs appear
         setShowForm(true);
     };
 
@@ -197,10 +196,12 @@ const POListPage = () => {
                 .filter((line: any) => line.remaining_quantity > 0)
                 .map((line: any) => ({
                     item_id: line.item_id,
+                    _selectedName: line.item_name || '',
                     quantity: line.remaining_quantity,
                     unit_price: line.estimated_unit_price,
                     description: line.description || '',
                     pr_line_id: line.pr_line_id,
+                    tax_code_id: line.tax_code_id || null,
                     tax_rate: 0,
                     tax_amount: 0,
                 }));
@@ -215,7 +216,7 @@ const POListPage = () => {
 
     return (
         <div className="p-8 space-y-8 animate-in fade-in duration-700">
-            <div className="flex justify-between items-end">
+            <div className="flex items-center justify-between gap-4">
                 <div>
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
                         Purchase Orders
@@ -378,58 +379,46 @@ const POListPage = () => {
                                 </div>
                             </div>
 
-                            {/* Row 2: Link PR + Currency */}
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Link to Requisition</label>
-                                    <select
-                                        value={formData.pr_id}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-slate-200"
-                                        onChange={(e) => setFormData({ ...formData, pr_id: e.target.value })}
-                                    >
-                                        <option value="">None (standalone PO)</option>
-                                        {approvedPrs.length > 0 && (
-                                            <optgroup label="✅ Available for Conversion">
-                                                {approvedPrs.map(pr => (
-                                                    <option key={pr.id} value={pr.id}>
-                                                        PR-{pr.id.slice(0, 8).toUpperCase()} — {pr.pr_lines?.length || 0} items — {pr.status.replace(/_/g, ' ')}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                        {allPrs.filter(pr => !['approved', 'partially_converted', 'converted_to_po'].includes(pr.status) && pr.status !== 'rejected' && pr.status !== 'closed').length > 0 && (
-                                            <optgroup label="⏳ Pending Approval (Not Available)">
-                                                {allPrs.filter(pr => !['approved', 'partially_converted', 'converted_to_po'].includes(pr.status) && pr.status !== 'rejected' && pr.status !== 'closed').map(pr => (
-                                                    <option key={pr.id} value={pr.id} disabled>
-                                                        PR-{pr.id.slice(0, 8).toUpperCase()} — {pr.pr_lines?.length || 0} items — {pr.status.replace(/_/g, ' ')}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                        {approvedPrs.length === 0 && allPrs.filter(pr => !['approved', 'partially_converted', 'converted_to_po'].includes(pr.status) && pr.status !== 'rejected' && pr.status !== 'closed').length === 0 && (
-                                            <option disabled>No purchase requisitions available</option>
-                                        )}
-                                    </select>
-                                    {approvedPrs.length === 0 && allPrs.filter(pr => ['pending_approval', 'draft'].includes(pr.status)).length > 0 && (
-                                        <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
-                                            <span>⚠️</span>
-                                            <span>You have {allPrs.filter(pr => ['pending_approval', 'draft'].includes(pr.status)).length} pending PR(s). PRs must be approved before conversion to PO.</span>
-                                        </p>
+                            {/* Row 2: Link PR (full width) */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Link to Requisition</label>
+                                <select
+                                    value={formData.pr_id}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-slate-200"
+                                    onChange={(e) => setFormData({ ...formData, pr_id: e.target.value })}
+                                >
+                                    <option value="">None (standalone PO)</option>
+                                    {approvedPrs.length > 0 && (
+                                        <optgroup label="✅ Available for Conversion">
+                                            {approvedPrs.map(pr => (
+                                                <option key={pr.id} value={pr.id}>
+                                                    PR-{pr.id.slice(0, 8).toUpperCase()} — {pr.pr_lines?.length || 0} items — {pr.status.replace(/_/g, ' ')}
+                                                </option>
+                                            ))}
+                                        </optgroup>
                                     )}
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Currency</label>
-                                    <select
-                                        value={formData.currency}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-slate-200"
-                                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                                    >
-                                        <option value="USD">USD — US Dollar</option>
-                                        <option value="EUR">EUR — Euro</option>
-                                        <option value="GBP">GBP — British Pound</option>
-                                        <option value="INR">INR — Indian Rupee</option>
-                                        <option value="AED">AED — UAE Dirham</option>
-                                    </select>
+                                    {allPrs.filter(pr => !['approved', 'partially_converted', 'converted_to_po'].includes(pr.status) && pr.status !== 'rejected' && pr.status !== 'closed').length > 0 && (
+                                        <optgroup label="⏳ Pending Approval (Not Available)">
+                                            {allPrs.filter(pr => !['approved', 'partially_converted', 'converted_to_po'].includes(pr.status) && pr.status !== 'rejected' && pr.status !== 'closed').map(pr => (
+                                                <option key={pr.id} value={pr.id} disabled>
+                                                    PR-{pr.id.slice(0, 8).toUpperCase()} — {pr.pr_lines?.length || 0} items — {pr.status.replace(/_/g, ' ')}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
+                                    {approvedPrs.length === 0 && allPrs.filter(pr => !['approved', 'partially_converted', 'converted_to_po'].includes(pr.status) && pr.status !== 'rejected' && pr.status !== 'closed').length === 0 && (
+                                        <option disabled>No purchase requisitions available</option>
+                                    )}
+                                </select>
+                                {approvedPrs.length === 0 && allPrs.filter(pr => ['pending_approval', 'draft'].includes(pr.status)).length > 0 && (
+                                    <p className="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
+                                        <span>⚠️</span>
+                                        <span>You have {allPrs.filter(pr => ['pending_approval', 'draft'].includes(pr.status)).length} pending PR(s). PRs must be approved before conversion to PO.</span>
+                                    </p>
+                                )}
+                                <div className="text-xs text-slate-500 mt-1">
+                                    Currency: <span className="text-slate-300 font-semibold">{settings?.base_currency || 'USD'}</span>
+                                    <span className="text-slate-600"> · From org settings</span>
                                 </div>
                             </div>
 
@@ -468,19 +457,16 @@ const POListPage = () => {
                                     </div>
                                 )}
                                 {items.map((item, idx) => {
-                                    const catalogItem = catalogItems.find((it: any) => it.id === item.item_id);
-                                    const hasTaxCode = !!(item.tax_code_id || catalogItem?.tax_code_id);
+                                    const hasTaxCode = !!item.tax_code_id;
                                     return (
                                         <div key={idx} className="flex gap-3 items-end animate-in slide-in-from-top-2 duration-300">
                                             <div className="flex-1 space-y-1">
-                                                <select
+                                                <ItemSearchSelector
                                                     value={item.item_id}
-                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                    onChange={(e) => updateItem(idx, 'item_id', e.target.value)}
-                                                >
-                                                    <option value="">Select Item</option>
-                                                    {catalogItems.map(it => <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>)}
-                                                </select>
+                                                    selectedName={item._selectedName}
+                                                    onSelect={(selected) => updateItemWithProduct(idx, selected)}
+                                                    className="flex-1"
+                                                />
                                             </div>
                                             <div className="w-20 space-y-1">
                                                 <input
@@ -504,7 +490,7 @@ const POListPage = () => {
                                                 />
                                             </div>
                                             <div className="w-24 space-y-1">
-                                                {/* Tax rate badge — resolved server-side, show indicator */}
+                                                {/* Tax rate badge — resolved server-side */}
                                                 <div className={`px-3 py-2 rounded-lg text-xs font-bold text-center border ${
                                                     hasTaxCode
                                                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'

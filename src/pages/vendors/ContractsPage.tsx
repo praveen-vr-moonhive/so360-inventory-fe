@@ -17,7 +17,7 @@ const ContractsPage = () => {
     }, []);
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
+        <div className="p-8 space-y-8 animate-in fade-in duration-700">
             <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-rose-400 bg-clip-text text-transparent">
                     Subcontractor Contracts

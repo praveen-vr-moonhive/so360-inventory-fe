@@ -122,7 +122,7 @@ const StockLocationsPage = () => {
 
     return (
         <div className="p-8">
-            <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <header className="mb-8 flex items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white tracking-tight">Warehouses</h1>
                     <p className="text-slate-400 mt-1">Manage physical storage facilities and fulfillment centers</p>

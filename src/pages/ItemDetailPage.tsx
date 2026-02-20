@@ -385,7 +385,7 @@ const ItemDetailPage = () => {
         <div className="min-h-screen">
             {/* Error Banner */}
             {error && (
-                <div className="max-w-7xl mx-auto px-8 pt-4">
+                <div className="px-8 pt-4">
                     <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-3 rounded-lg text-sm flex items-center justify-between">
                         <span>{error}</span>
                         <button onClick={() => setError(null)} className="text-rose-400 hover:text-rose-300"><X size={16} /></button>
@@ -395,7 +395,7 @@ const ItemDetailPage = () => {
 
             {/* ═══ STICKY HEADER BAR ═══ */}
             <div className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800">
-                <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+                <div className="px-8 py-4 flex items-center justify-between">
                     {isEditing ? (
                         <>
                             <button
@@ -453,7 +453,7 @@ const ItemDetailPage = () => {
                 </div>
             </div>
 
-            <div className="p-8 max-w-7xl mx-auto">
+            <div className="p-8">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* ═══ LEFT COLUMN ═══ */}
                     <div className="lg:col-span-1 space-y-6">

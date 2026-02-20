@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { procurementService } from '../../services/procurementService';
-import { inventoryService } from '../../services/inventoryService';
+import ItemSearchSelector from '../../components/ItemSearchSelector';
 
 interface PRLine {
     id: string;
@@ -27,32 +27,21 @@ const PRListPage = () => {
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ description: '', required_date: '' });
     const [items, setItems] = useState<any[]>([]);
-    const [catalogItems, setCatalogItems] = useState<any[]>([]);
 
     useEffect(() => {
         fetchData();
-        loadCatalog();
     }, []);
 
     const fetchData = async () => {
         try {
             const data = await procurementService.getPRs();
-            setPrs(data);
+            setPrs(Array.isArray(data) ? data : (data?.data || []));
         } catch (error) {
             console.error('Failed to fetch PRs', error);
         } finally {
             setLoading(false);
         }
     };
-
-    const loadCatalog = async () => {
-        try {
-            const data = await inventoryService.getItems();
-            setCatalogItems(data.data || []);
-        } catch (error) {
-            console.error('Failed to load catalog', error);
-        }
-    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -62,7 +51,8 @@ const PRListPage = () => {
                 items: items.map(it => ({
                     item_id: it.item_id,
                     quantity: parseFloat(it.quantity),
-                    estimated_unit_price: parseFloat(it.price)
+                    estimated_unit_price: parseFloat(it.price),
+                    description: it.description || undefined,
                 }))
             });
             setShowForm(false);
@@ -85,7 +75,7 @@ const PRListPage = () => {
 
         try {
             await procurementService.deletePR(prId);
-            await fetchData(); // Refresh list
+            await fetchData();
             alert('Purchase Requisition deleted successfully');
         } catch (err: any) {
             alert(err.message || 'Failed to delete PR');
@@ -93,7 +83,7 @@ const PRListPage = () => {
     };
 
     const addItemLine = () => {
-        setItems([...items, { item_id: '', quantity: 1, price: 0 }]);
+        setItems([...items, { item_id: '', _selectedName: '', quantity: 1, price: 0, description: '' }]);
     };
 
     const updateItem = (index: number, field: string, value: any) => {
@@ -102,10 +92,21 @@ const PRListPage = () => {
         setItems(newItems);
     };
 
+    const updateItemWithProduct = (index: number, selected: { id: string; name: string; sku: string; price?: number }) => {
+        const newItems = [...items];
+        newItems[index] = {
+            ...newItems[index],
+            item_id: selected.id,
+            _selectedName: `${selected.name} (${selected.sku})`,
+            price: selected.price ?? 0,
+        };
+        setItems(newItems);
+    };
+
     return (
         <div className="p-8 space-y-8 animate-in fade-in duration-700">
             {/* Header */}
-            <div className="flex justify-between items-end">
+            <div className="flex items-center justify-between gap-4">
                 <div>
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
                         Purchase Requisitions
@@ -248,31 +249,58 @@ const PRListPage = () => {
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Requested Items</label>
                                     <button type="button" onClick={addItemLine} className="text-blue-400 hover:text-blue-300 text-xs font-bold">+ Add Item</button>
                                 </div>
+                                {items.length === 0 && (
+                                    <div className="text-center py-6 text-slate-600 text-sm border border-dashed border-slate-800 rounded-xl">
+                                        No items added yet. Click "+ Add Item" to begin.
+                                    </div>
+                                )}
                                 {items.map((item, idx) => (
-                                    <div key={idx} className="flex gap-4 items-end animate-in slide-in-from-top-2 duration-300">
-                                        <div className="flex-1 space-y-1">
-                                            <select
-                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                onChange={(e) => updateItem(idx, 'item_id', e.target.value)}
+                                    <div key={idx} className="space-y-2 p-3 bg-slate-950/50 border border-slate-800 rounded-xl animate-in slide-in-from-top-2 duration-300">
+                                        <div className="flex gap-3 items-center">
+                                            <div className="flex-1">
+                                                <ItemSearchSelector
+                                                    value={item.item_id}
+                                                    selectedName={item._selectedName}
+                                                    onSelect={(selected) => updateItemWithProduct(idx, selected)}
+                                                />
+                                            </div>
+                                            <div className="w-24">
+                                                <input
+                                                    type="number"
+                                                    placeholder="Qty"
+                                                    value={item.quantity}
+                                                    min="1"
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                    onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="w-32">
+                                                <input
+                                                    type="number"
+                                                    placeholder="Est. Price"
+                                                    value={item.price}
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                    onChange={(e) => updateItem(idx, 'price', e.target.value)}
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                                                className="text-red-400 hover:text-red-300 text-lg font-bold px-2 py-1 transition-colors flex-shrink-0"
+                                                title="Remove item"
                                             >
-                                                <option value="">Select Item</option>
-                                                {catalogItems.map(it => <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>)}
-                                            </select>
+                                                ×
+                                            </button>
                                         </div>
-                                        <div className="w-24 space-y-1">
+                                        <div>
                                             <input
-                                                type="number"
-                                                placeholder="Qty"
-                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="w-32 space-y-1">
-                                            <input
-                                                type="number"
-                                                placeholder="Est. Price"
-                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                                onChange={(e) => updateItem(idx, 'price', e.target.value)}
+                                                type="text"
+                                                placeholder="Description (optional)"
+                                                value={item.description}
+                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 placeholder-slate-600"
+                                                onChange={(e) => updateItem(idx, 'description', e.target.value)}
                                             />
                                         </div>
                                     </div>

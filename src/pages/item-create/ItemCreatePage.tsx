@@ -351,7 +351,7 @@ const ItemCreatePage = () => {
         <div className="min-h-screen pb-24">
             {/* Header */}
             <div className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800">
-                <div className="max-w-5xl mx-auto px-8 py-4 flex items-center justify-between">
+                <div className="px-8 py-4 flex items-center justify-between">
                     <button
                         onClick={() => navigate('/inventory/items')}
                         className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
@@ -379,7 +379,7 @@ const ItemCreatePage = () => {
                 </div>
             </div>
 
-            <div className="max-w-5xl mx-auto px-8 pt-6">
+            <div className="px-8 pt-6">
                 <h1 className="text-2xl font-bold text-white mb-6">Register New Item</h1>
 
                 {error && (
