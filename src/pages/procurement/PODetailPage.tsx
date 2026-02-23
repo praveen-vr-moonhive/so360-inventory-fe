@@ -41,6 +41,7 @@ const PODetailPage = () => {
     const [po, setPo] = useState<PO | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [statusAction, setStatusAction] = useState<string | null>(null);
 
     useEffect(() => {
         if (id) fetchPO();
@@ -227,6 +228,23 @@ const PODetailPage = () => {
 </body>
 </html>`);
         printWindow.document.close();
+    };
+
+    const handleStatusChange = async (status: 'sent' | 'closed' | 'cancelled') => {
+        if (!po) return;
+
+        const label = status.replace(/_/g, ' ');
+        if (!window.confirm(`Change PO status to "${label}"?`)) return;
+
+        setStatusAction(status);
+        try {
+            await procurementService.updatePOStatus(po.id, { status });
+            await fetchPO();
+        } catch (err: any) {
+            alert(err.message || `Failed to update PO status to ${label}`);
+        } finally {
+            setStatusAction(null);
+        }
     };
 
     if (isLoading) {
@@ -489,7 +507,70 @@ const PODetailPage = () => {
                     <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
                         <h2 className="text-lg font-bold text-white mb-4">Actions</h2>
                         <div className="flex flex-wrap gap-3">
+                            {po.status === 'draft' && (
+                                <>
+                                    <button
+                                        onClick={() => handleStatusChange('sent')}
+                                        disabled={!!statusAction}
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+                                    >
+                                        {statusAction === 'sent' ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                                        Send PO
+                                    </button>
+                                    <button
+                                        onClick={() => handleStatusChange('cancelled')}
+                                        disabled={!!statusAction}
+                                        className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-60 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+                                    >
+                                        {statusAction === 'cancelled' ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                                        Cancel PO
+                                    </button>
+                                </>
+                            )}
                             {po.status === 'sent' && (
+                                <>
+                                    <button
+                                        onClick={() => handleStatusChange('cancelled')}
+                                        disabled={!!statusAction || totalReceived > 0}
+                                        className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-60 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+                                        title={totalReceived > 0 ? 'Cannot cancel after receiving goods' : ''}
+                                    >
+                                        {statusAction === 'cancelled' ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                                        Cancel PO
+                                    </button>
+                                    {receiveProgress === 100 && (
+                                        <button
+                                            onClick={() => handleStatusChange('closed')}
+                                            disabled={!!statusAction}
+                                            className="px-4 py-2 bg-slate-600 hover:bg-slate-500 disabled:opacity-60 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+                                        >
+                                            {statusAction === 'closed' ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                                            Close PO
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                            {po.status === 'partially_received' && (
+                                <button
+                                    onClick={() => handleStatusChange('closed')}
+                                    disabled={!!statusAction}
+                                    className="px-4 py-2 bg-slate-600 hover:bg-slate-500 disabled:opacity-60 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+                                >
+                                    {statusAction === 'closed' ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                                    Close PO
+                                </button>
+                            )}
+                            {po.status === 'received' && (
+                                <button
+                                    onClick={() => handleStatusChange('closed')}
+                                    disabled={!!statusAction}
+                                    className="px-4 py-2 bg-slate-600 hover:bg-slate-500 disabled:opacity-60 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+                                >
+                                    {statusAction === 'closed' ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                                    Close PO
+                                </button>
+                            )}
+                            {(po.status === 'sent' || po.status === 'partially_received') && (
                                 <button
                                     onClick={() => navigate('/procurement/grn')}
                                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-all flex items-center gap-2"

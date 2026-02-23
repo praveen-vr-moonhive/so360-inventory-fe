@@ -92,6 +92,8 @@ const ItemCreatePage = () => {
     const [error, setError] = useState<string | null>(null);
     const [tabErrors, setTabErrors] = useState<Partial<Record<TabId, boolean>>>({});
     const [taxCodes, setTaxCodes] = useState<TaxCodeOption[]>([]);
+    const [isTaxCodesLoading, setIsTaxCodesLoading] = useState(true);
+    const [taxCodesError, setTaxCodesError] = useState<string | null>(null);
 
     // Inline create states — category
     const [showNewCategory, setShowNewCategory] = useState(false);
@@ -110,18 +112,29 @@ const ItemCreatePage = () => {
     }, []);
 
     const loadSettings = async () => {
+        setIsTaxCodesLoading(true);
+        setTaxCodesError(null);
+
         try {
-            const [settings, warehouseData, taxCodeData] = await Promise.all([
+            const [settings, warehouseData] = await Promise.all([
                 inventoryService.getSettings(),
                 inventoryService.getLocations(),
-                inventoryService.getTaxCodes().catch(() => []),
             ]);
             setCategories(settings.categories || []);
             setUoms(settings.uoms || []);
             setWarehouses(Array.isArray(warehouseData) ? warehouseData : []);
-            setTaxCodes(taxCodeData);
         } catch {
             // Settings are optional, don't block the form
+        }
+
+        try {
+            const taxCodeData = await inventoryService.getTaxCodes();
+            setTaxCodes(taxCodeData);
+        } catch {
+            setTaxCodes([]);
+            setTaxCodesError('Failed to load organization tax codes from Core settings.');
+        } finally {
+            setIsTaxCodesLoading(false);
         }
     };
 
@@ -176,6 +189,9 @@ const ItemCreatePage = () => {
         if (!form.name.trim()) {
             errors.basic = true;
         }
+        if (isTaxCodesLoading || taxCodesError) {
+            errors.pricing = true;
+        }
         setTabErrors(errors);
 
         if (Object.keys(errors).length > 0) {
@@ -183,7 +199,13 @@ const ItemCreatePage = () => {
             const firstErrorTab = (['basic', 'media', 'pricing', 'category', 'stock', 'shipping', 'attributes'] as TabId[])
                 .find(t => errors[t]);
             if (firstErrorTab) setActiveTab(firstErrorTab);
-            setError('Please fill in all required fields');
+            if (isTaxCodesLoading) {
+                setError('Tax codes are still loading. Please wait before saving.');
+            } else if (taxCodesError) {
+                setError('Tax codes failed to load from Core settings. Please retry.');
+            } else {
+                setError('Please fill in all required fields');
+            }
             return false;
         }
         return true;
@@ -218,7 +240,6 @@ const ItemCreatePage = () => {
             if (form.reorder_level) dto.reorder_level = parseInt(form.reorder_level);
             if (form.weight) dto.weight = parseFloat(form.weight);
             if (form.weight) dto.weight_unit = form.weight_unit;
-            if (form.tax_class.trim()) dto.tax_class = form.tax_class.trim();
             if (form.hsn_code.trim()) dto.hsn_code = form.hsn_code.trim();
             if (form.product_type_id) dto.product_type_id = form.product_type_id;
             if (Object.keys(form.custom_attributes).length > 0) dto.custom_attributes = form.custom_attributes;
@@ -291,6 +312,8 @@ const ItemCreatePage = () => {
                         updateField={updateField}
                         currencySymbol={currencySymbol}
                         taxCodes={taxCodes}
+                        isTaxCodesLoading={isTaxCodesLoading}
+                        taxCodesError={taxCodesError}
                     />
                 );
             case 'category':
@@ -369,7 +392,7 @@ const ItemCreatePage = () => {
                         </button>
                         <button
                             onClick={() => handleSubmit()}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isTaxCodesLoading || !!taxCodesError}
                             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-semibold transition-all shadow-lg shadow-blue-900/20"
                         >
                             {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
@@ -385,6 +408,11 @@ const ItemCreatePage = () => {
                 {error && (
                     <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-3 rounded-lg text-sm mb-6">
                         {error}
+                    </div>
+                )}
+                {taxCodesError && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-4 py-3 rounded-lg text-sm mb-6">
+                        {taxCodesError}
                     </div>
                 )}
 
@@ -415,7 +443,7 @@ const ItemCreatePage = () => {
                     </button>
                     <button
                         onClick={() => handleSubmit()}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || isTaxCodesLoading || !!taxCodesError}
                         className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold transition-all"
                     >
                         {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}

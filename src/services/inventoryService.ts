@@ -283,7 +283,8 @@ class InventoryService {
      */
     async getTaxCodes(): Promise<{ id: string; name: string; code?: string; rate: number; jurisdiction?: string }[]> {
         if (!this.orgId) throw new Error('OrgId not set');
-        const response = await fetch(`${this.coreOrigin}/v1/financials/tax-codes/${this.orgId}`, {
+        const endpoint = `${this.coreOrigin}/v1/financials/tax-codes/${this.orgId}`;
+        const response = await fetch(endpoint, {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.accessToken}`,
@@ -292,12 +293,31 @@ class InventoryService {
             },
         });
         if (!response.ok) {
-            console.warn('Could not fetch tax codes from Core API');
+            console.error(`[InventoryService] Could not fetch tax codes from Core API (${response.status}) at ${endpoint}`);
             return [];
         }
-        const result = await response.json();
-        // Core API may return array or { data: [...] }
-        return Array.isArray(result) ? result : (result.data || []);
+        const result = await response.json().catch(() => null);
+        let rows: any[] = [];
+
+        // Core API may return array or paginated object: { data: [...] }
+        if (Array.isArray(result)) {
+            rows = result;
+        } else if (result && Array.isArray((result as any).data)) {
+            rows = (result as any).data;
+        } else {
+            console.error('[InventoryService] Unexpected tax codes payload shape from Core API', result);
+            return [];
+        }
+
+        return rows
+            .filter((row: any) => row && typeof row.id === 'string')
+            .map((row: any) => ({
+                id: row.id,
+                name: row.name || row.code || 'Tax Code',
+                code: row.code || undefined,
+                rate: Number(row.rate ?? 0),
+                jurisdiction: row.jurisdiction || undefined,
+            }));
     }
 
     // ==================== Business Settings (Core Backend) ====================

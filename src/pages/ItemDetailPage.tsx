@@ -87,6 +87,8 @@ const ItemDetailPage = () => {
     const [uoms, setUoms] = useState<Unit[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [taxCodes, setTaxCodes] = useState<TaxCodeOption[]>([]);
+    const [isTaxCodesLoading, setIsTaxCodesLoading] = useState(true);
+    const [taxCodesError, setTaxCodesError] = useState<string | null>(null);
     const [showNewUom, setShowNewUom] = useState(false);
     const [newUomName, setNewUomName] = useState('');
     const [newUomAbbr, setNewUomAbbr] = useState('');
@@ -99,6 +101,20 @@ const ItemDetailPage = () => {
     // Image preview
     const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+    const loadTaxCodes = async () => {
+        setIsTaxCodesLoading(true);
+        setTaxCodesError(null);
+        try {
+            const taxCodeData = await inventoryService.getTaxCodes();
+            setTaxCodes(taxCodeData);
+        } catch {
+            setTaxCodes([]);
+            setTaxCodesError('Failed to load organization tax codes from Core settings.');
+        } finally {
+            setIsTaxCodesLoading(false);
+        }
+    };
+
     // ── Data Loading ──────────────────────────────────
     const fetchData = async () => {
         if (!id) return;
@@ -108,6 +124,7 @@ const ItemDetailPage = () => {
                 inventoryService.getItem(id),
                 inventoryService.getLedger(id)
             ]);
+            await loadTaxCodes();
             if (itemData) {
                 setItem(itemData);
                 setLedger(ledgerData);
@@ -133,16 +150,15 @@ const ItemDetailPage = () => {
 
         // Load settings and warehouses for dropdowns
         try {
-            const [settings, warehouseData, taxCodeData] = await Promise.all([
+            const [settings, warehouseData] = await Promise.all([
                 inventoryService.getSettings(),
                 inventoryService.getLocations(),
-                inventoryService.getTaxCodes().catch(() => []),
             ]);
             setCategories(settings.categories || []);
             setUoms(settings.uoms || []);
             setWarehouses(Array.isArray(warehouseData) ? warehouseData : []);
-            setTaxCodes(taxCodeData);
         } catch { /* non-blocking */ }
+        await loadTaxCodes();
     };
 
     const handleCancelEdit = () => {
@@ -182,6 +198,14 @@ const ItemDetailPage = () => {
             setEditTab('basic');
             return;
         }
+        if (isTaxCodesLoading || taxCodesError) {
+            setTabErrors({ pricing: true });
+            setEditTab('pricing');
+            setError(isTaxCodesLoading
+                ? 'Tax codes are still loading. Please wait before saving.'
+                : 'Tax codes failed to load from Core settings. Please retry.');
+            return;
+        }
 
         setIsSaving(true);
         try {
@@ -205,7 +229,6 @@ const ItemDetailPage = () => {
             if (editForm.min_stock_threshold) dto.min_stock_threshold = parseInt(editForm.min_stock_threshold); else dto.min_stock_threshold = null;
             if (editForm.reorder_level) dto.reorder_level = parseInt(editForm.reorder_level); else dto.reorder_level = null;
             if (editForm.weight) { dto.weight = parseFloat(editForm.weight); dto.weight_unit = editForm.weight_unit; } else { dto.weight = null; dto.weight_unit = null; }
-            if (editForm.tax_class.trim()) dto.tax_class = editForm.tax_class.trim(); else dto.tax_class = null;
             if (editForm.hsn_code.trim()) dto.hsn_code = editForm.hsn_code.trim(); else dto.hsn_code = null;
             if (editForm.product_type_id) dto.product_type_id = editForm.product_type_id; else dto.product_type_id = null;
             if (Object.keys(editForm.custom_attributes).length > 0) dto.custom_attributes = editForm.custom_attributes; else dto.custom_attributes = null;
@@ -271,7 +294,7 @@ const ItemDetailPage = () => {
             case 'media':
                 return <MediaTab image_urls={editForm.image_urls} updateField={updateField} />;
             case 'pricing':
-                return <PricingTab price={editForm.price} cost={editForm.cost} tax_class={editForm.tax_class} tax_code_id={editForm.tax_code_id} hsn_code={editForm.hsn_code} updateField={updateField} currencySymbol={currencySymbol} taxCodes={taxCodes} />;
+                return <PricingTab price={editForm.price} cost={editForm.cost} tax_class={editForm.tax_class} tax_code_id={editForm.tax_code_id} hsn_code={editForm.hsn_code} updateField={updateField} currencySymbol={currencySymbol} taxCodes={taxCodes} isTaxCodesLoading={isTaxCodesLoading} taxCodesError={taxCodesError} />;
             case 'category':
                 return (
                     <CategoryTab
@@ -330,6 +353,15 @@ const ItemDetailPage = () => {
     const hasImages = item.image_urls && item.image_urls.length > 0;
     const margin = (item.price && item.cost && item.price > 0 && item.cost > 0)
         ? (((item.price - item.cost) / item.price) * 100).toFixed(1) : null;
+    const currentTaxCodeId = (item as any).tax_code_id as string | undefined;
+    const selectedTaxCode = currentTaxCodeId
+        ? taxCodes.find(tc => tc.id === currentTaxCodeId)
+        : undefined;
+    const taxDisplayValue = currentTaxCodeId
+        ? (selectedTaxCode
+            ? `${selectedTaxCode.name} — ${selectedTaxCode.rate}%`
+            : `Unknown tax code (${currentTaxCodeId})`)
+        : (item.tax_class ? `Legacy tax class: ${item.tax_class}` : null);
 
     // ── Movement Table Columns ────────────────────────
     const columns = [
@@ -392,6 +424,13 @@ const ItemDetailPage = () => {
                     </div>
                 </div>
             )}
+            {taxCodesError && (
+                <div className="px-8 pt-4">
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-4 py-3 rounded-lg text-sm">
+                        {taxCodesError}
+                    </div>
+                </div>
+            )}
 
             {/* ═══ STICKY HEADER BAR ═══ */}
             <div className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800">
@@ -414,7 +453,7 @@ const ItemDetailPage = () => {
                                 </button>
                                 <button
                                     onClick={handleSaveEdit}
-                                    disabled={isSaving}
+                                    disabled={isSaving || isTaxCodesLoading || !!taxCodesError}
                                     className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2"
                                 >
                                     {isSaving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : <><Save size={16} /> Save Changes</>}
@@ -536,68 +575,73 @@ const ItemDetailPage = () => {
                             </div>
                         </div>
 
-                        {/* Section B: Stock Pulse */}
-                        <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-900/40 relative overflow-hidden">
-                            <div className="absolute -right-4 -bottom-4 opacity-10">
-                                <Package size={140} />
-                            </div>
-                            <span className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">Available Physical Stock</span>
-                            <div className="text-5xl font-black mt-2 flex items-baseline gap-2">
-                                {totalStock}
-                                <span className="text-sm font-normal text-blue-200 uppercase">{item.units?.abbreviation || 'PCS'}</span>
-                            </div>
-                            <p className="mt-4 text-[10px] text-blue-100 flex items-center gap-1.5 bg-blue-500/30 w-fit px-2 py-1 rounded-lg">
-                                <Info size={12} /> Real-time aggregate count
-                            </p>
-                        </div>
-
-                        {/* Section C: Stock Thresholds */}
-                        {(item.min_stock_threshold || item.reorder_level) ? (
-                            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 hover:border-slate-700 transition-colors">
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Stock Thresholds</h3>
-                                <div className="space-y-3">
-                                    {item.min_stock_threshold != null && (
-                                        <div className="flex items-center justify-between p-3 bg-slate-800/30 rounded-xl border border-slate-700/30">
-                                            <div className="flex items-center gap-2 text-slate-400">
-                                                <AlertTriangle size={14} />
-                                                <span className="text-xs font-semibold">Min Stock</span>
-                                            </div>
-                                            <span className="text-sm text-white font-medium">{item.min_stock_threshold}</span>
-                                        </div>
-                                    )}
-                                    {item.reorder_level != null && (
-                                        <div className="flex items-center justify-between p-3 bg-slate-800/30 rounded-xl border border-slate-700/30">
-                                            <div className="flex items-center gap-2 text-slate-400">
-                                                <RefreshCcw size={14} />
-                                                <span className="text-xs font-semibold">Reorder Level</span>
-                                            </div>
-                                            <span className="text-sm text-white font-medium">{item.reorder_level}</span>
-                                        </div>
-                                    )}
-                                </div>
-                                {item.min_stock_threshold != null && totalStock < item.min_stock_threshold && (
-                                    <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2">
-                                        <AlertTriangle size={14} className="text-amber-400 flex-shrink-0" />
-                                        <span className="text-xs text-amber-400 font-medium">Stock is below minimum threshold!</span>
-                                    </div>
-                                )}
-                            </div>
-                        ) : null}
-
-                        {/* Section D: Product Lifecycle */}
-                        <LifecycleStatusPanel
-                            itemId={item.id}
-                            productStatus={item.product_status || 'draft'}
-                            onStatusChange={(newStatus) => {
-                                setItem(prev => prev ? { ...prev, product_status: newStatus } : prev);
-                            }}
-                        />
                     </div>
 
                     {/* ═══ RIGHT COLUMN ═══ */}
                     {isEditing ? (
                         /* ── EDIT MODE ── */
-                        <div className="lg:col-span-2">
+                        <div className="lg:col-span-2 space-y-4">
+                            {/* ═══ 3 Summary Cards ═══ */}
+                            <div className="grid grid-cols-3 gap-4">
+                                {/* Card 1: Available Physical Stock */}
+                                <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-900/40 relative overflow-hidden">
+                                    <div className="absolute -right-3 -bottom-3 opacity-10">
+                                        <Package size={80} />
+                                    </div>
+                                    <span className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">Physical Stock</span>
+                                    <div className="text-4xl font-black mt-2 flex items-baseline gap-1.5">
+                                        {totalStock}
+                                        <span className="text-xs font-normal text-blue-200 uppercase">{item.units?.abbreviation || 'PCS'}</span>
+                                    </div>
+                                    <p className="mt-3 text-[10px] text-blue-100 flex items-center gap-1.5 bg-blue-500/30 w-fit px-2 py-1 rounded-lg">
+                                        <Info size={11} /> Real-time count
+                                    </p>
+                                </div>
+                                {/* Card 2: Stock Thresholds */}
+                                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-colors">
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Stock Thresholds</h3>
+                                    {(item.min_stock_threshold != null || item.reorder_level != null) ? (
+                                        <div className="space-y-2">
+                                            {item.min_stock_threshold != null && (
+                                                <div className="flex items-center justify-between p-2.5 bg-slate-800/30 rounded-xl border border-slate-700/30">
+                                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                                        <AlertTriangle size={13} />
+                                                        <span className="text-xs font-semibold">Min Stock</span>
+                                                    </div>
+                                                    <span className="text-sm text-white font-medium">{item.min_stock_threshold}</span>
+                                                </div>
+                                            )}
+                                            {item.reorder_level != null && (
+                                                <div className="flex items-center justify-between p-2.5 bg-slate-800/30 rounded-xl border border-slate-700/30">
+                                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                                        <RefreshCcw size={13} />
+                                                        <span className="text-xs font-semibold">Reorder Level</span>
+                                                    </div>
+                                                    <span className="text-sm text-white font-medium">{item.reorder_level}</span>
+                                                </div>
+                                            )}
+                                            {item.min_stock_threshold != null && totalStock < item.min_stock_threshold && (
+                                                <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-1.5">
+                                                    <AlertTriangle size={12} className="text-amber-400 flex-shrink-0" />
+                                                    <span className="text-[10px] text-amber-400 font-medium">Below minimum!</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-600 italic">No thresholds set</p>
+                                    )}
+                                </div>
+                                {/* Card 3: Product Lifecycle */}
+                                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-colors">
+                                    <LifecycleStatusPanel
+                                        itemId={item.id}
+                                        productStatus={item.product_status || 'draft'}
+                                        onStatusChange={(newStatus) => {
+                                            setItem(prev => prev ? { ...prev, product_status: newStatus } : prev);
+                                        }}
+                                    />
+                                </div>
+                            </div>
                             <div className="bg-slate-900/50 border border-slate-800 rounded-xl ring-1 ring-blue-500/20">
                                 <TabNavigation activeTab={editTab} onTabChange={setEditTab} tabErrors={tabErrors} />
                                 <div className="p-6 min-h-[24rem]">
@@ -607,7 +651,68 @@ const ItemDetailPage = () => {
                         </div>
                     ) : (
                         /* ── VIEW MODE ── */
-                        <div className="lg:col-span-2">
+                        <div className="lg:col-span-2 space-y-4">
+                            {/* ═══ 3 Summary Cards ═══ */}
+                            <div className="grid grid-cols-3 gap-4">
+                                {/* Card 1: Available Physical Stock */}
+                                <div className="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-900/40 relative overflow-hidden">
+                                    <div className="absolute -right-3 -bottom-3 opacity-10">
+                                        <Package size={80} />
+                                    </div>
+                                    <span className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">Physical Stock</span>
+                                    <div className="text-4xl font-black mt-2 flex items-baseline gap-1.5">
+                                        {totalStock}
+                                        <span className="text-xs font-normal text-blue-200 uppercase">{item.units?.abbreviation || 'PCS'}</span>
+                                    </div>
+                                    <p className="mt-3 text-[10px] text-blue-100 flex items-center gap-1.5 bg-blue-500/30 w-fit px-2 py-1 rounded-lg">
+                                        <Info size={11} /> Real-time count
+                                    </p>
+                                </div>
+                                {/* Card 2: Stock Thresholds */}
+                                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-colors">
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Stock Thresholds</h3>
+                                    {(item.min_stock_threshold != null || item.reorder_level != null) ? (
+                                        <div className="space-y-2">
+                                            {item.min_stock_threshold != null && (
+                                                <div className="flex items-center justify-between p-2.5 bg-slate-800/30 rounded-xl border border-slate-700/30">
+                                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                                        <AlertTriangle size={13} />
+                                                        <span className="text-xs font-semibold">Min Stock</span>
+                                                    </div>
+                                                    <span className="text-sm text-white font-medium">{item.min_stock_threshold}</span>
+                                                </div>
+                                            )}
+                                            {item.reorder_level != null && (
+                                                <div className="flex items-center justify-between p-2.5 bg-slate-800/30 rounded-xl border border-slate-700/30">
+                                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                                        <RefreshCcw size={13} />
+                                                        <span className="text-xs font-semibold">Reorder Level</span>
+                                                    </div>
+                                                    <span className="text-sm text-white font-medium">{item.reorder_level}</span>
+                                                </div>
+                                            )}
+                                            {item.min_stock_threshold != null && totalStock < item.min_stock_threshold && (
+                                                <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-1.5">
+                                                    <AlertTriangle size={12} className="text-amber-400 flex-shrink-0" />
+                                                    <span className="text-[10px] text-amber-400 font-medium">Below minimum!</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-600 italic">No thresholds set</p>
+                                    )}
+                                </div>
+                                {/* Card 3: Product Lifecycle */}
+                                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-colors">
+                                    <LifecycleStatusPanel
+                                        itemId={item.id}
+                                        productStatus={item.product_status || 'draft'}
+                                        onStatusChange={(newStatus) => {
+                                            setItem(prev => prev ? { ...prev, product_status: newStatus } : prev);
+                                        }}
+                                    />
+                                </div>
+                            </div>
                             <div className="bg-slate-900/50 border border-slate-800 rounded-xl">
                                 {/* View Tab Bar — 8 tabs */}
                                 <div className="flex gap-1 border-b border-slate-800 overflow-x-auto overflow-y-hidden scrollbar-hide rounded-t-xl">
@@ -746,18 +851,12 @@ const ItemDetailPage = () => {
 
                                             <FormSection title="Tax Information">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <ReadOnlyField
-                                                        label="Tax Code"
-                                                        value={
-                                                            (item as any).tax_code_id
-                                                                ? (taxCodes.find(tc => tc.id === (item as any).tax_code_id)
-                                                                    ? `${taxCodes.find(tc => tc.id === (item as any).tax_code_id)!.name} — ${taxCodes.find(tc => tc.id === (item as any).tax_code_id)!.rate}%`
-                                                                    : item.tax_class || (item as any).tax_code_id)
-                                                                : item.tax_class
-                                                        }
-                                                    />
+                                                    <ReadOnlyField label="Tax Code" value={taxDisplayValue} />
                                                     <ReadOnlyField label="HSN / SAC Code" value={item.hsn_code} />
                                                 </div>
+                                                {isTaxCodesLoading && (
+                                                    <p className="text-xs text-slate-500 mt-2">Loading tax code labels from Core settings...</p>
+                                                )}
                                             </FormSection>
                                         </div>
                                     )}

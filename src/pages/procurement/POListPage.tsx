@@ -300,7 +300,10 @@ const POListPage = () => {
                                     <td className="px-6 py-5">
                                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest border
                                             ${po.status === 'sent' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                po.status === 'partially_received' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                                 po.status === 'received' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                    po.status === 'closed' ? 'bg-slate-500/10 text-slate-300 border-slate-500/20' :
+                                                        po.status === 'cancelled' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                                                     'bg-slate-700/50 text-slate-400 border-slate-600'}
                                         `}>
                                             {po.status}

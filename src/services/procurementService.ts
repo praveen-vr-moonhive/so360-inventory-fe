@@ -75,6 +75,13 @@ class ProcurementService {
         return this.request(`/po/detail/${id}`);
     }
 
+    async updatePOStatus(id: string, dto: { status: string; reason?: string }) {
+        return this.request(`/po/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify(dto),
+        });
+    }
+
     // Goods Receipt
     async createGRN(dto: any) {
         return this.request('/grn', {
