@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Clock, AlertTriangle, Box, X, RefreshCcw } from 'lucide-react';
+import { Search, MapPin, Clock, AlertTriangle, Box, X, RefreshCcw, BookOpen } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
 import { StockBalance } from '../types/inventory';
 import { Table } from '../components/common/Table';
@@ -16,13 +16,18 @@ const StockOverviewPage = () => {
     const [lowStockFilter, setLowStockFilter] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [glValuation, setGlValuation] = useState<{ gl_balance: number; source: string } | null>(null);
 
     const fetchStock = async () => {
         setIsLoading(true);
         setError(null);
         try {
-            const stockLevelsData = await inventoryService.getStockOverview();
+            const [stockLevelsData, glData] = await Promise.all([
+                inventoryService.getStockOverview(),
+                inventoryService.getGLInventoryValuation(),
+            ]);
             setStockLevels(stockLevelsData);
+            setGlValuation(glData);
         } catch (err) {
             console.error('Failed to fetch stock levels', err);
             setError('Failed to load stock data. Please try again.');
@@ -156,16 +161,41 @@ const StockOverviewPage = () => {
                 </button>
             </header>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                 <div className="bg-slate-900/40 border border-slate-800/50 p-4 rounded-xl">
                     <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total Positions</span>
                     <div className="text-xl font-bold text-white mt-0.5">{stockLevels.length}</div>
                 </div>
                 <div className="bg-slate-900/40 border border-slate-800/50 p-4 rounded-xl">
-                    <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total Value</span>
+                    <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Stock Value</span>
                     <div className="text-xl font-bold text-blue-400 mt-0.5">
                         {formatters.formatCurrency(stockLevels.reduce((sum, sl) => sum + (sl.valuation || 0), 0))}
                     </div>
+                </div>
+                <div className="bg-slate-900/40 border border-slate-800/50 p-4 rounded-xl">
+                    <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <BookOpen size={10} /> GL Balance
+                    </span>
+                    {glValuation?.source === 'accounting_gl' ? (
+                        <>
+                            <div className="text-xl font-bold text-emerald-400 mt-0.5">
+                                {formatters.formatCurrency(glValuation.gl_balance)}
+                            </div>
+                            {(() => {
+                                const stockVal = stockLevels.reduce((sum, sl) => sum + (sl.valuation || 0), 0);
+                                const drift = Math.abs(stockVal - glValuation.gl_balance);
+                                return drift > 0.01 ? (
+                                    <span className="text-[10px] text-amber-400">
+                                        Drift: {formatters.formatCurrency(drift)}
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] text-emerald-500">In sync</span>
+                                );
+                            })()}
+                        </>
+                    ) : (
+                        <div className="text-sm text-slate-500 mt-0.5">Unavailable</div>
+                    )}
                 </div>
                 <div className="bg-slate-900/40 border border-slate-800/50 p-4 rounded-xl">
                     <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Low Stock</span>

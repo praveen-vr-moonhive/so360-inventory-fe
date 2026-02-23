@@ -241,6 +241,15 @@ class InventoryService {
         return this.request(`/stock-overview/${this.orgId}`);
     }
 
+    // GL Inventory Valuation (from Accounting)
+    async getGLInventoryValuation(): Promise<{ gl_balance: number; source: string }> {
+        try {
+            return await this.request(`/stock-overview/${this.orgId}/gl-valuation`);
+        } catch {
+            return { gl_balance: 0, source: 'unavailable' };
+        }
+    }
+
     // Adjustments
     async createAdjustment(dto: any) {
         return this.request('/adjust', {
