@@ -38,6 +38,8 @@ const StockOverviewPage = () => {
 
     useEffect(() => {
         fetchStock();
+        const pollInterval = setInterval(fetchStock, 60 * 1000);
+        return () => clearInterval(pollInterval);
     }, []);
 
     // Reset page when filters change
