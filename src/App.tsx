@@ -22,6 +22,7 @@ const GRNEntryPage = lazy(() => import('./pages/procurement/GRNEntryPage'));
 const VendorListPage = lazy(() => import('./pages/vendors/VendorListPage'));
 const VendorDetailPage = lazy(() => import('./pages/vendors/VendorDetailPage'));
 const ContractsPage = lazy(() => import('./pages/vendors/ContractsPage'));
+const OpeningBalancePage = lazy(() => import('./pages/procurement/OpeningBalancePage'));
 
 
 
@@ -121,6 +122,7 @@ const App = () => {
                 <Route path="grn" element={<GRNListPage />} />
                 <Route path="grn/new" element={<GRNEntryPage />} />
                 <Route path="grn/:id" element={<GRNDetailPage />} />
+                <Route path="opening-balance" element={<OpeningBalancePage />} />
 
                 {/* ── Vendor routes (mounted at /vendors/*) ── */}
                 <Route path="contracts" element={<ContractsPage />} />
@@ -134,6 +136,7 @@ const App = () => {
                 <Route path="procurement/grn" element={<GRNListPage />} />
                 <Route path="procurement/grn/new" element={<GRNEntryPage />} />
                 <Route path="procurement/grn/:id" element={<GRNDetailPage />} />
+                <Route path="procurement/opening-balance" element={<OpeningBalancePage />} />
                 <Route path="vendors" element={<VendorListPage />} />
                 <Route path="vendors/:id" element={<VendorDetailPage />} />
                 <Route path="vendors/contracts" element={<ContractsPage />} />

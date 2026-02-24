@@ -252,6 +252,12 @@ const POListPage = () => {
                         </div>
                     )}
                     <button
+                        onClick={() => navigate('/procurement/opening-balance')}
+                        className="px-6 py-3 bg-amber-600/20 border border-amber-500/50 text-amber-400 rounded-xl font-semibold transition-all hover:bg-amber-600/30 active:scale-95 flex items-center gap-2"
+                    >
+                        <span className="text-base leading-none">⚖</span> Opening Balance
+                    </button>
+                    <button
                         onClick={openNewPOForm}
                         className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-blue-900/20 active:scale-95 flex items-center gap-2"
                     >

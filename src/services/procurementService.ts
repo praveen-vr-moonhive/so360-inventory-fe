@@ -118,6 +118,26 @@ class ProcurementService {
     async getAnalytics() {
         return this.request(`/analytics/${inventoryService.getOrgId()}`);
     }
+
+    // Opening Balance
+    async createOpeningBalance(dto: {
+        vendor_id?: string;
+        vendor_name?: string;
+        po_number?: string;
+        grn_number?: string;
+        effective_date?: string;
+        note?: string;
+        items: Array<{ item_id: string; warehouse_id: string; quantity: number; unit_cost: number }>;
+    }) {
+        return this.request('/opening-balance', {
+            method: 'POST',
+            body: JSON.stringify(dto),
+        });
+    }
+
+    async getUnlinkedMovements() {
+        return this.request(`/unlinked-movements/${inventoryService.getOrgId()}`);
+    }
 }
 
 export const procurementService = new ProcurementService();
