@@ -26,7 +26,7 @@ const OpeningBalancePage = lazy(() => import('./pages/procurement/OpeningBalance
 
 
 
-import { ShellContext } from '@so360/shell-context';
+import { useShellBridge } from '@so360/shell-context';
 import { inventoryService } from './services/inventoryService';
 import { procurementService } from './services/procurementService';
 import { vendorService } from './services/vendorService';
@@ -34,7 +34,7 @@ import { mediaService } from './services/mediaService';
 
 
 const MfeShellInitializer = ({ children }: { children: React.ReactNode }) => {
-    const shell = React.useContext(ShellContext);
+    const shell = useShellBridge();
     const [isSynced, setIsSynced] = React.useState(false);
 
     React.useEffect(() => {
