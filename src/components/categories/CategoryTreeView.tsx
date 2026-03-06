@@ -11,6 +11,7 @@ interface CategoryTreeViewProps {
     onUpdate: (id: string, data: { name?: string; description?: string; icon_url?: string | null; image_url?: string | null; color?: string | null }) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
     canManage: boolean;
+    onSelect: (id: string) => void;
 }
 
 interface TreeItemProps {
@@ -19,6 +20,7 @@ interface TreeItemProps {
     onUpdate: (id: string, data: { name?: string; description?: string; icon_url?: string | null; image_url?: string | null; color?: string | null }) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
     canManage: boolean;
+    onSelect: (id: string) => void;
 }
 
 const CategoryAvatar: React.FC<{
@@ -90,7 +92,7 @@ const CategoryAvatar: React.FC<{
     );
 };
 
-const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, canManage }) => {
+const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, canManage, onSelect }) => {
     const [expanded, setExpanded] = useState(true);
     const [showAddChild, setShowAddChild] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -188,7 +190,10 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, ca
                 ) : (
                     <>
                         <div className="flex-1 min-w-0 mt-0.5">
-                            <span className="text-sm text-slate-300 block truncate">{node.name}</span>
+                            <span
+                                className="text-sm text-slate-300 block truncate cursor-pointer hover:text-white"
+                                onClick={() => onSelect(node.id)}
+                            >{node.name}</span>
                             {node.description && (
                                 <span className="text-xs text-slate-500 block truncate">{node.description}</span>
                             )}
@@ -231,7 +236,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, ca
             {expanded && hasChildren && (
                 <div>
                     {node.children.map(child => (
-                        <TreeItem key={child.id} node={child} onAdd={onAdd} onUpdate={onUpdate} onDelete={onDelete} canManage={canManage} />
+                        <TreeItem key={child.id} node={child} onAdd={onAdd} onUpdate={onUpdate} onDelete={onDelete} canManage={canManage} onSelect={onSelect} />
                     ))}
                 </div>
             )}
@@ -239,7 +244,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, ca
     );
 };
 
-const CategoryTreeView: React.FC<CategoryTreeViewProps> = ({ tree, onAdd, onUpdate, onDelete, canManage }) => {
+const CategoryTreeView: React.FC<CategoryTreeViewProps> = ({ tree, onAdd, onUpdate, onDelete, canManage, onSelect }) => {
     const [showAddRoot, setShowAddRoot] = useState(false);
     const [rootName, setRootName] = useState('');
     const [isAddingRoot, setIsAddingRoot] = useState(false);
@@ -263,7 +268,7 @@ const CategoryTreeView: React.FC<CategoryTreeViewProps> = ({ tree, onAdd, onUpda
             ) : (
                 <div className="space-y-0.5">
                     {tree.map(node => (
-                        <TreeItem key={node.id} node={node} onAdd={onAdd} onUpdate={onUpdate} onDelete={onDelete} canManage={canManage} />
+                        <TreeItem key={node.id} node={node} onAdd={onAdd} onUpdate={onUpdate} onDelete={onDelete} canManage={canManage} onSelect={onSelect} />
                     ))}
                 </div>
             )}

@@ -248,41 +248,15 @@ const CategoriesPage = () => {
                 <div className="w-1/3 min-w-[260px] bg-slate-900/50 border border-slate-800 rounded-2xl p-5">
                     <h2 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Category Tree</h2>
                     <div className="overflow-y-auto max-h-[600px]">
-                        {tree.length === 0 ? (
-                            <p className="text-sm text-slate-500 italic py-4">No categories yet. Add one below.</p>
-                        ) : (
-                            <div
-                                className="space-y-0.5"
-                                onClick={(e) => {
-                                    // Detect clicks on tree node names to select them
-                                    const target = e.target as HTMLElement;
-                                    const row = target.closest('[data-cat-id]');
-                                    if (row) setSelectedId(row.getAttribute('data-cat-id'));
-                                }}
-                            >
-                                {/* Render tree with selection highlight — wrap each node */}
-                                <CategoryTreeView
-                                    tree={tree}
-                                    onAdd={handleAdd}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                    canManage={canManage}
-                                />
-                            </div>
-                        )}
+                        <CategoryTreeView
+                            tree={tree}
+                            onAdd={handleAdd}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            canManage={canManage}
+                            onSelect={setSelectedId}
+                        />
                     </div>
-
-                    {canManage && tree.length === 0 && (
-                        <div className="mt-4">
-                            <CategoryTreeView
-                                tree={[]}
-                                onAdd={handleAdd}
-                                onUpdate={handleUpdate}
-                                onDelete={handleDelete}
-                                canManage={canManage}
-                            />
-                        </div>
-                    )}
                 </div>
 
                 {/* Right panel — detail editor */}
@@ -297,7 +271,9 @@ const CategoriesPage = () => {
                     ) : (
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-lg font-bold text-white">Edit Category</h2>
+                                <h2 className="text-lg font-bold text-white">
+                                    {selectedCategory.parent_id ? 'Edit Subcategory' : 'Edit Category'}
+                                </h2>
                                 <div className="flex items-center gap-2">
                                     {saveSuccess && <span className="text-xs text-emerald-400">Saved!</span>}
                                     {saveError && <span className="text-xs text-rose-400">{saveError}</span>}

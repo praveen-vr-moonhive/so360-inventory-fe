@@ -256,6 +256,7 @@ const SettingsPage = () => {
                             }
                         }}
                         canManage={can('manage_locations')}
+                        onSelect={() => {}}
                     />
                 </section>
 
