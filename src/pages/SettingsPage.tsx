@@ -16,6 +16,10 @@ interface CategoryItem {
     id: string;
     name: string;
     description?: string;
+    icon_url?: string | null;
+    image_url?: string | null;
+    color?: string | null;
+    sort_order?: number;
 }
 
 interface InventorySettingsData {

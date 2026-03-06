@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { ChevronRight, ChevronDown, Plus, Pencil, Trash2, X, Check, Camera, Loader2 } from 'lucide-react';
 import { TreeNode } from '../../utils/categoryTree';
+import { mediaService } from '../../services/mediaService';
+
+const PRESET_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#06B6D4', '#64748B'];
 
 interface CategoryTreeViewProps {
     tree: TreeNode[];
     onAdd: (name: string, description: string, parentId?: string) => Promise<void>;
-    onUpdate: (id: string, data: { name?: string; description?: string }) => Promise<void>;
+    onUpdate: (id: string, data: { name?: string; description?: string; icon_url?: string | null; image_url?: string | null; color?: string | null }) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
     canManage: boolean;
 }
@@ -13,16 +16,86 @@ interface CategoryTreeViewProps {
 interface TreeItemProps {
     node: TreeNode;
     onAdd: (name: string, description: string, parentId?: string) => Promise<void>;
-    onUpdate: (id: string, data: { name?: string; description?: string }) => Promise<void>;
+    onUpdate: (id: string, data: { name?: string; description?: string; icon_url?: string | null; image_url?: string | null; color?: string | null }) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
     canManage: boolean;
 }
+
+const CategoryAvatar: React.FC<{
+    node: TreeNode;
+    canManage: boolean;
+    onUpdate: (id: string, data: { icon_url?: string | null }) => Promise<void>;
+}> = ({ node, canManage, onUpdate }) => {
+    const fileRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) { setUploadError('Max 2MB'); return; }
+        if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) { setUploadError('PNG/JPG/SVG only'); return; }
+        setUploadError(null);
+        setUploading(true);
+        try {
+            const { url } = await mediaService.uploadFile(file);
+            await onUpdate(node.id, { icon_url: url });
+        } catch (err: any) {
+            setUploadError(err.message || 'Upload failed');
+        } finally {
+            setUploading(false);
+            if (fileRef.current) fileRef.current.value = '';
+        }
+    };
+
+    const bg = node.color || '#334155';
+    const letter = node.name.charAt(0).toUpperCase();
+
+    return (
+        <div className="relative flex-shrink-0">
+            <label className={`block w-7 h-7 rounded-lg overflow-hidden cursor-pointer group/avatar ${canManage ? 'cursor-pointer' : 'cursor-default'}`}>
+                {uploading ? (
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: bg }}>
+                        <Loader2 size={12} className="text-white animate-spin" />
+                    </div>
+                ) : node.icon_url ? (
+                    <div className="relative w-full h-full">
+                        <img src={node.icon_url} alt={node.name} className="w-full h-full object-cover" />
+                        {canManage && (
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
+                                <Camera size={10} className="text-white" />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white relative" style={{ background: bg }}>
+                        {letter}
+                        {canManage && (
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
+                                <Camera size={10} className="text-white" />
+                            </div>
+                        )}
+                    </div>
+                )}
+                {canManage && (
+                    <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden" onChange={handleFileChange} />
+                )}
+            </label>
+            {uploadError && (
+                <div className="absolute left-0 top-8 z-10 bg-rose-900 border border-rose-500/50 text-rose-300 text-xs px-2 py-1 rounded whitespace-nowrap">
+                    {uploadError}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, canManage }) => {
     const [expanded, setExpanded] = useState(true);
     const [showAddChild, setShowAddChild] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(node.name);
+    const [editColor, setEditColor] = useState(node.color || '');
     const [childName, setChildName] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -42,14 +115,17 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, ca
     };
 
     const handleSaveEdit = async () => {
-        if (!editName.trim() || editName === node.name) {
+        if (!editName.trim()) {
             setIsEditing(false);
             setEditName(node.name);
             return;
         }
         setIsSaving(true);
         try {
-            await onUpdate(node.id, { name: editName.trim() });
+            const updates: { name?: string; color?: string | null } = {};
+            if (editName.trim() !== node.name) updates.name = editName.trim();
+            if (editColor !== (node.color || '')) updates.color = editColor || null;
+            if (Object.keys(updates).length > 0) await onUpdate(node.id, updates);
             setIsEditing(false);
         } finally {
             setIsSaving(false);
@@ -63,36 +139,71 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, ca
 
     return (
         <div>
-            <div className="flex items-center gap-1 group py-1.5 px-2 rounded-lg hover:bg-slate-800/50 transition-colors" style={{ paddingLeft: `${node.depth * 20 + 8}px` }}>
+            <div className="flex items-start gap-1 group py-1.5 px-2 rounded-lg hover:bg-slate-800/50 transition-colors" style={{ paddingLeft: `${node.depth * 20 + 8}px` }}>
                 <button
                     type="button"
                     onClick={() => setExpanded(!expanded)}
-                    className={`w-5 h-5 flex items-center justify-center text-slate-500 ${hasChildren ? 'hover:text-slate-300' : 'invisible'}`}
+                    className={`w-5 h-5 flex items-center justify-center text-slate-500 mt-0.5 flex-shrink-0 ${hasChildren ? 'hover:text-slate-300' : 'invisible'}`}
                 >
                     {hasChildren && (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                 </button>
 
+                <CategoryAvatar node={node} canManage={canManage} onUpdate={onUpdate} />
+
                 {isEditing ? (
-                    <div className="flex items-center gap-2 flex-1">
-                        <input
-                            type="text"
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            className="bg-slate-800 border border-slate-600 px-2 py-0.5 rounded text-sm text-white flex-1"
-                            autoFocus
-                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') { setIsEditing(false); setEditName(node.name); } }}
-                        />
-                        <button onClick={handleSaveEdit} disabled={isSaving} className="text-emerald-400 hover:text-emerald-300"><Check size={14} /></button>
-                        <button onClick={() => { setIsEditing(false); setEditName(node.name); }} className="text-slate-400 hover:text-white"><X size={14} /></button>
+                    <div className="flex flex-col gap-2 flex-1 mt-0.5">
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={editName}
+                                onChange={e => setEditName(e.target.value)}
+                                className="bg-slate-800 border border-slate-600 px-2 py-0.5 rounded text-sm text-white flex-1"
+                                autoFocus
+                                onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') { setIsEditing(false); setEditName(node.name); setEditColor(node.color || ''); } }}
+                            />
+                            <button onClick={handleSaveEdit} disabled={isSaving} className="text-emerald-400 hover:text-emerald-300"><Check size={14} /></button>
+                            <button onClick={() => { setIsEditing(false); setEditName(node.name); setEditColor(node.color || ''); }} className="text-slate-400 hover:text-white"><X size={14} /></button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            {PRESET_COLORS.map(c => (
+                                <button
+                                    key={c}
+                                    type="button"
+                                    onClick={() => setEditColor(c)}
+                                    className="w-5 h-5 rounded-full border-2 transition-all"
+                                    style={{ background: c, borderColor: editColor === c ? 'white' : 'transparent' }}
+                                />
+                            ))}
+                            {editColor && (
+                                <button
+                                    type="button"
+                                    onClick={() => setEditColor('')}
+                                    className="text-xs text-slate-500 hover:text-slate-300 ml-1"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                     </div>
                 ) : (
                     <>
-                        <span className="text-sm text-slate-300 flex-1">{node.name}</span>
+                        <div className="flex-1 min-w-0 mt-0.5">
+                            <span className="text-sm text-slate-300 block truncate">{node.name}</span>
+                            {node.description && (
+                                <span className="text-xs text-slate-500 block truncate">{node.description}</span>
+                            )}
+                        </div>
                         {canManage && (
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => setShowAddChild(true)} className="p-1 text-slate-500 hover:text-blue-400" title="Add subcategory"><Plus size={13} /></button>
-                                <button onClick={() => setIsEditing(true)} className="p-1 text-slate-500 hover:text-amber-400" title="Edit"><Pencil size={13} /></button>
-                                <button onClick={handleDelete} className="p-1 text-slate-500 hover:text-rose-400" title="Delete"><Trash2 size={13} /></button>
+                            <div className="flex items-center gap-1 ml-1 flex-shrink-0">
+                                <button
+                                    onClick={() => setShowAddChild(true)}
+                                    className="px-1.5 py-0.5 text-xs text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                    title="Add subcategory"
+                                >
+                                    + Sub
+                                </button>
+                                <button onClick={() => setIsEditing(true)} className="p-1 text-slate-500 hover:text-amber-400" title="Edit"><Pencil size={12} /></button>
+                                <button onClick={handleDelete} className="p-1 text-slate-500 hover:text-rose-400" title="Delete"><Trash2 size={12} /></button>
                             </div>
                         )}
                     </>
@@ -100,7 +211,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ node, onAdd, onUpdate, onDelete, ca
             </div>
 
             {showAddChild && (
-                <div className="flex items-center gap-2 py-1.5" style={{ paddingLeft: `${(node.depth + 1) * 20 + 32}px` }}>
+                <div className="flex items-center gap-2 py-1.5" style={{ paddingLeft: `${(node.depth + 1) * 20 + 40}px` }}>
                     <input
                         type="text"
                         value={childName}

@@ -44,6 +44,8 @@ export interface FlatNode {
     description?: string;
     parent_id?: string;
     depth: number;
+    icon_url?: string | null;
+    color?: string | null;
 }
 
 export function flattenTree(roots: TreeNode[]): FlatNode[] {
@@ -57,6 +59,8 @@ export function flattenTree(roots: TreeNode[]): FlatNode[] {
                 description: node.description,
                 parent_id: node.parent_id,
                 depth: node.depth,
+                icon_url: node.icon_url,
+                color: node.color,
             });
             walk(node.children);
         }

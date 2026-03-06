@@ -10,6 +10,10 @@ export interface ItemCategory {
     description?: string;
     parent_id?: string;
     children?: ItemCategory[];
+    icon_url?: string | null;
+    image_url?: string | null;
+    color?: string | null;
+    sort_order?: number;
 }
 
 export interface Item {

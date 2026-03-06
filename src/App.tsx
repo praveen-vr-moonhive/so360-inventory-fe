@@ -23,6 +23,7 @@ const VendorListPage = lazy(() => import('./pages/vendors/VendorListPage'));
 const VendorDetailPage = lazy(() => import('./pages/vendors/VendorDetailPage'));
 const ContractsPage = lazy(() => import('./pages/vendors/ContractsPage'));
 const OpeningBalancePage = lazy(() => import('./pages/procurement/OpeningBalancePage'));
+const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
 
 
 
@@ -113,6 +114,7 @@ const App = () => {
                 <Route path="transfers" element={<StockTransfersPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="settings/product-types" element={<ProductTypeSettingsPage />} />
+                <Route path="categories" element={<CategoriesPage />} />
 
                 {/* ── Procurement routes (mounted at /procurement/*) ── */}
                 <Route path="pr" element={<PRListPage />} />

@@ -364,17 +364,19 @@ class InventoryService {
         });
     }
 
-    async createCategory(name: string, description?: string, parentId?: string) {
+    async createCategory(name: string, description?: string, parentId?: string, iconUrl?: string, color?: string) {
         const body: Record<string, any> = { name };
         if (description) body.description = description;
         if (parentId) body.parent_id = parentId;
+        if (iconUrl) body.icon_url = iconUrl;
+        if (color) body.color = color;
         return this.request(`/settings/${this.orgId}/categories`, {
             method: 'POST',
             body: JSON.stringify(body),
         });
     }
 
-    async updateCategory(id: string, data: { name?: string; description?: string; parent_id?: string | null }) {
+    async updateCategory(id: string, data: { name?: string; description?: string; parent_id?: string | null; icon_url?: string | null; image_url?: string | null; color?: string | null; sort_order?: number }) {
         return this.request(`/settings/${this.orgId}/categories/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),

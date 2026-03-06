@@ -22,13 +22,24 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ categories, value, onCh
         return flattenTree(tree);
     }, [categories]);
 
+    const getPath = (id: string): string => {
+        const cat = categories.find(c => c.id === id);
+        if (!cat) return '';
+        if (!cat.parent_id) return cat.name;
+        const parentPath = getPath(cat.parent_id);
+        return parentPath ? `${parentPath} / ${cat.name}` : cat.name;
+    };
+
     const filtered = useMemo(() => {
         if (!search.trim()) return flatList;
         const s = search.toLowerCase();
-        return flatList.filter(n => n.name.toLowerCase().includes(s));
+        return flatList.filter(n => {
+            const path = getPath(n.id).toLowerCase();
+            return path.includes(s) || n.name.toLowerCase().includes(s);
+        });
     }, [flatList, search]);
 
-    const selectedName = categories.find(c => c.id === value)?.name || '';
+    const selectedPath = value ? getPath(value) : '';
 
     const handleQuickAdd = async () => {
         if (!quickAddName.trim() || !onQuickAdd) return;
@@ -49,10 +60,10 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ categories, value, onCh
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
             >
-                <span className={value ? 'text-slate-200' : 'text-slate-600'}>
-                    {selectedName || 'Select category...'}
+                <span className={`text-sm ${value ? 'text-slate-200' : 'text-slate-600'} truncate`}>
+                    {selectedPath || 'Select category...'}
                 </span>
-                <ChevronDown size={16} className="text-slate-500" />
+                <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
             </button>
 
             {isOpen && (
@@ -79,18 +90,32 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ categories, value, onCh
                         >
                             None
                         </button>
-                        {filtered.map(node => (
-                            <button
-                                key={node.id}
-                                type="button"
-                                onClick={() => { onChange(node.id); setIsOpen(false); setSearch(''); }}
-                                className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors ${node.id === value ? 'text-blue-400 bg-blue-500/10' : 'text-slate-300'}`}
-                                style={{ paddingLeft: `${node.depth * 16 + 16}px` }}
-                            >
-                                {node.depth > 0 && <span className="text-slate-600 mr-1">{'  '.repeat(node.depth)}└ </span>}
-                                {node.name}
-                            </button>
-                        ))}
+                        {filtered.map(node => {
+                            const path = search.trim() && node.depth > 0 ? getPath(node.id) : null;
+                            const iconBg = node.color || '#334155';
+                            return (
+                                <button
+                                    key={node.id}
+                                    type="button"
+                                    onClick={() => { onChange(node.id); setIsOpen(false); setSearch(''); }}
+                                    className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors flex items-center gap-2 ${node.id === value ? 'text-blue-400 bg-blue-500/10' : 'text-slate-300'}`}
+                                    style={{ paddingLeft: search.trim() ? '16px' : `${node.depth * 16 + 16}px` }}
+                                >
+                                    {node.icon_url ? (
+                                        <img src={node.icon_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                                    ) : (
+                                        <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center text-xs font-bold text-white" style={{ background: iconBg }}>
+                                            {node.name.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <span className="truncate">
+                                        {path || (node.depth > 0 && !search.trim() ? (
+                                            <><span className="text-slate-600">{'  '.repeat(node.depth)}└ </span>{node.name}</>
+                                        ) : node.name)}
+                                    </span>
+                                </button>
+                            );
+                        })}
                         {filtered.length === 0 && (
                             <p className="px-4 py-3 text-sm text-slate-500 text-center">No categories found</p>
                         )}
