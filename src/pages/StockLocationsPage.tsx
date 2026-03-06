@@ -15,6 +15,7 @@ const StockLocationsPage = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [maxWarehouses, setMaxWarehouses] = useState<number | null>(null);
 
     // Create form state
     const [newWarehouse, setNewWarehouse] = useState({
@@ -52,8 +53,33 @@ const StockLocationsPage = () => {
         }
     };
 
+    const fetchWarehouseLimit = async () => {
+        try {
+            const data = await inventoryService.request('/warehouses/entitlement-limits', { method: 'GET' }).catch(() => null);
+            if (data?.max_warehouses !== undefined) {
+                setMaxWarehouses(data.max_warehouses);
+                return;
+            }
+        } catch {}
+        // Fallback: fetch directly from subscription service
+        try {
+            const subOrigin = (import.meta as any)?.env?.VITE_SO360_SUBSCRIPTION_API || 'http://localhost:3026';
+            const resp = await fetch(`${subOrigin}/v1/entitlements/effective-matrix`, {
+                headers: {
+                    'X-Tenant-Id': inventoryService['tenantId'] || '',
+                    'X-Org-Id': inventoryService['orgId'] || '',
+                },
+            });
+            if (resp.ok) {
+                const matrix = await resp.json();
+                setMaxWarehouses(matrix?.limits?.max_warehouses ?? null);
+            }
+        } catch {}
+    };
+
     useEffect(() => {
         fetchWarehouses();
+        fetchWarehouseLimit();
     }, []);
 
     const handleCreateWarehouse = async (e: React.FormEvent) => {
@@ -120,6 +146,8 @@ const StockLocationsPage = () => {
         }
     };
 
+    const atWarehouseLimit = maxWarehouses !== null && warehouses.length >= maxWarehouses;
+
     return (
         <div className="p-8">
             <header className="mb-8 flex items-center justify-between gap-4">
@@ -129,14 +157,30 @@ const StockLocationsPage = () => {
                 </div>
                 {can('manage_locations') && (
                     <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg font-semibold transition-all shadow-lg shadow-blue-900/20 active:scale-95"
+                        onClick={() => !atWarehouseLimit && setIsCreateModalOpen(true)}
+                        disabled={atWarehouseLimit}
+                        title={atWarehouseLimit ? `${warehouses.length}/${maxWarehouses} warehouses used — upgrade your plan to add more` : undefined}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition-all shadow-lg active:scale-95 ${atWarehouseLimit ? 'bg-slate-700 text-slate-400 cursor-not-allowed shadow-none' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20'}`}
                     >
                         <Plus size={20} />
                         New Warehouse
+                        {atWarehouseLimit && <span className="text-xs font-normal ml-1">({warehouses.length}/{maxWarehouses})</span>}
                     </button>
                 )}
             </header>
+
+            {maxWarehouses !== null && (
+                <div className="mb-6 flex items-center justify-between bg-slate-900/50 border border-slate-800 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-slate-400">
+                        Warehouse limit: <span className={`font-semibold ${atWarehouseLimit ? 'text-amber-400' : 'text-slate-200'}`}>{warehouses.length} / {maxWarehouses} used</span>
+                    </span>
+                    {atWarehouseLimit && (
+                        <a href="/settings/subscription" className="text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors">
+                            Upgrade Plan →
+                        </a>
+                    )}
+                </div>
+            )}
 
             {error && (
                 <div className="mb-6 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-3 rounded-lg flex items-center gap-3">
@@ -234,13 +278,16 @@ const StockLocationsPage = () => {
 
                     {can('manage_locations') && (
                         <button
-                            onClick={() => setIsCreateModalOpen(true)}
-                            className="border-2 border-dashed border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-slate-500 hover:border-slate-400 hover:bg-slate-900/30 transition-all gap-3 h-full min-h-[200px]"
+                            onClick={() => !atWarehouseLimit && setIsCreateModalOpen(true)}
+                            disabled={atWarehouseLimit}
+                            title={atWarehouseLimit ? `${warehouses.length}/${maxWarehouses} warehouses used — upgrade your plan to add more` : undefined}
+                            className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all gap-3 h-full min-h-[200px] ${atWarehouseLimit ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-slate-800 text-slate-500 hover:border-slate-400 hover:bg-slate-900/30'}`}
                         >
                             <div className="p-3 rounded-full bg-slate-800/50">
                                 <Plus size={24} />
                             </div>
                             <span className="font-semibold text-sm">Add New Warehouse</span>
+                            {atWarehouseLimit && <span className="text-xs text-amber-500/70">Plan limit reached</span>}
                         </button>
                     )}
                 </div>
