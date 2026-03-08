@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, Image } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 import { mediaService } from '../../services/mediaService';
 import ImageThumbnail from './ImageThumbnail';
 
@@ -10,7 +11,7 @@ interface MediaUploaderProps {
 }
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
-const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_SIZE = 900 * 1024; // 900KB — matches Core BE limit
 
 interface UploadingFile {
     id: string;
@@ -45,13 +46,31 @@ const MediaUploader: React.FC<MediaUploaderProps> = ({ imageUrls, onImagesChange
                 continue;
             }
 
-            if (file.size > MAX_SIZE) {
-                setUploading(prev => prev.map(u => u.id === tempId ? { ...u, error: 'Too large (max 2MB)' } : u));
+            // Lossless compression: PNG stays PNG (lossless), JPEG stays JPEG at 95% quality
+            // SVG is text — skip compression entirely
+            let processedFile: File = file;
+            if (file.type !== 'image/svg+xml') {
+                try {
+                    processedFile = await imageCompression(file, {
+                        maxSizeMB: 0.85,           // target 850KB (headroom under 900KB limit)
+                        maxWidthOrHeight: 2048,     // cap at 2K resolution for product images
+                        useWebWorker: true,         // non-blocking
+                        preserveExif: false,        // strip EXIF metadata to reduce size
+                        initialQuality: 0.95,       // near-lossless for JPEG (95% quality)
+                        // fileType NOT set → preserves original format (PNG stays PNG = lossless)
+                    });
+                } catch {
+                    processedFile = file; // fallback: upload original
+                }
+            }
+
+            if (processedFile.size > MAX_SIZE) {
+                setUploading(prev => prev.map(u => u.id === tempId ? { ...u, error: 'Too large (max 900KB)' } : u));
                 continue;
             }
 
             try {
-                const result = await mediaService.uploadFile(file);
+                const result = await mediaService.uploadFile(processedFile);
                 onImagesChange([...imageUrls, result.url]);
                 setUploading(prev => prev.filter(u => u.id !== tempId));
             } catch (err: any) {
@@ -105,7 +124,7 @@ const MediaUploader: React.FC<MediaUploaderProps> = ({ imageUrls, onImagesChange
                 <p className="text-sm text-slate-400 mt-3">
                     {isDragOver ? 'Drop files here' : 'Drag and drop images here, or click to browse'}
                 </p>
-                <p className="text-xs text-slate-600 mt-1">PNG, JPG, SVG — max 2MB each</p>
+                <p className="text-xs text-slate-600 mt-1">PNG, JPG, SVG — max 900KB each (auto-compressed)</p>
                 <input
                     ref={fileInputRef}
                     type="file"
