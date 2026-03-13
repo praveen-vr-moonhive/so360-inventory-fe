@@ -4,8 +4,10 @@ import { inventoryService } from '../services/inventoryService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../hooks/useAuth';
 import CategoryTreeView from '../components/categories/CategoryTreeView';
+import CategoryIconLibrary from '../components/categories/CategoryIconLibrary';
 import { buildCategoryTree } from '../utils/categoryTree';
 import { ItemCategory } from '../types/inventory';
+import { renderCategoryIcon, isPresetUrl } from '../constants/categoryIcons';
 
 const PRESET_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#06B6D4', '#64748B'];
 
@@ -94,6 +96,99 @@ const ImageUploadZone: React.FC<{
     );
 };
 
+// ─── Cards View ────────────────────────────────────────────────────────────────
+const CategoryCardsView: React.FC<{
+    categories: ItemCategory[];
+    selectedId: string | null;
+    onSelect: (id: string) => void;
+}> = ({ categories, selectedId, onSelect }) => {
+    const roots = categories.filter(c => !c.parent_id);
+
+    const getParentName = (parentId: string | null | undefined): string => {
+        if (!parentId) return '';
+        return categories.find(c => c.id === parentId)?.name || '';
+    };
+
+    const renderCard = (cat: ItemCategory) => {
+        const isRoot = !cat.parent_id;
+        const isSelected = cat.id === selectedId;
+
+        return (
+            <div
+                key={cat.id}
+                onClick={() => onSelect(cat.id)}
+                className={`relative cursor-pointer rounded-xl overflow-hidden transition-all hover:scale-[1.02] hover:opacity-95 ${
+                    isRoot ? 'col-span-2' : 'col-span-1'
+                } ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+                style={{ aspectRatio: isRoot ? '3/1' : '1/1' }}
+            >
+                {/* Background */}
+                {cat.image_url ? (
+                    <img src={cat.image_url} alt={cat.name} className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            background: cat.color
+                                ? `linear-gradient(135deg, ${cat.color}cc, ${cat.color}66)`
+                                : 'linear-gradient(135deg, #1e293b, #334155)',
+                        }}
+                    />
+                )}
+
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+
+                {/* Icon top-left */}
+                <div className="absolute top-2 left-2">
+                    {renderCategoryIcon({
+                        iconUrl: cat.icon_url,
+                        imageUrl: undefined,
+                        name: cat.name,
+                        color: cat.color,
+                        size: 28,
+                    })}
+                </div>
+
+                {/* Name bottom */}
+                <div className="absolute bottom-2 left-2 right-2">
+                    {!isRoot && getParentName(cat.parent_id) && (
+                        <p className="text-[10px] text-white/60 leading-none mb-0.5 truncate">{getParentName(cat.parent_id)}</p>
+                    )}
+                    <p className={`text-white font-semibold truncate ${isRoot ? 'text-base' : 'text-sm'}`}>{cat.name}</p>
+                </div>
+
+                {/* Banner indicator */}
+                {cat.image_url && (
+                    <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400" title="Has banner image" />
+                )}
+            </div>
+        );
+    };
+
+    // Build ordered list: root + its children, then next root + its children
+    const orderedCards: ItemCategory[] = [];
+    roots.forEach(root => {
+        orderedCards.push(root);
+        categories.filter(c => c.parent_id === root.id).forEach(child => orderedCards.push(child));
+    });
+    // Include subcategories whose parents aren't in roots (edge case)
+    categories.forEach(c => {
+        if (!orderedCards.find(o => o.id === c.id)) orderedCards.push(c);
+    });
+
+    if (orderedCards.length === 0) {
+        return <p className="text-sm text-slate-500 italic py-4">No categories created yet</p>;
+    }
+
+    return (
+        <div className="grid grid-cols-2 gap-2">
+            {orderedCards.map(cat => renderCard(cat))}
+        </div>
+    );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 const CategoriesPage = () => {
     const { can } = useAuth();
     const canManage = can('manage_locations');
@@ -102,6 +197,7 @@ const CategoriesPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'tree' | 'cards'>('tree');
 
     // Detail panel state
     const [editName, setEditName] = useState('');
@@ -244,18 +340,41 @@ const CategoriesPage = () => {
             )}
 
             <div className="flex gap-6 items-start">
-                {/* Left panel — tree */}
+                {/* Left panel — tree / cards */}
                 <div className="w-1/3 min-w-[260px] bg-slate-900/50 border border-slate-800 rounded-2xl p-5">
-                    <h2 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Category Tree</h2>
+                    <div className="flex items-center justify-between mb-1">
+                        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Categories</h2>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setViewMode('tree')}
+                                className={`px-2 py-0.5 rounded text-xs transition-colors ${viewMode === 'tree' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            >Tree</button>
+                            <button
+                                onClick={() => setViewMode('cards')}
+                                className={`px-2 py-0.5 rounded text-xs transition-colors ${viewMode === 'cards' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            >Cards</button>
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mb-3">
+                        {categories.filter(c => c.icon_url || c.image_url).length} of {categories.length} have images
+                    </p>
                     <div className="overflow-y-auto max-h-[600px]">
-                        <CategoryTreeView
-                            tree={tree}
-                            onAdd={handleAdd}
-                            onUpdate={handleUpdate}
-                            onDelete={handleDelete}
-                            canManage={canManage}
-                            onSelect={setSelectedId}
-                        />
+                        {viewMode === 'tree' ? (
+                            <CategoryTreeView
+                                tree={tree}
+                                onAdd={handleAdd}
+                                onUpdate={handleUpdate}
+                                onDelete={handleDelete}
+                                canManage={canManage}
+                                onSelect={setSelectedId}
+                            />
+                        ) : (
+                            <CategoryCardsView
+                                categories={categories}
+                                selectedId={selectedId}
+                                onSelect={setSelectedId}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -300,18 +419,37 @@ const CategoriesPage = () => {
 
                             {/* Icon upload + Name row */}
                             <div className="flex items-start gap-4">
-                                {/* Icon */}
-                                <div className="flex-shrink-0">
-                                    <label className="text-xs font-medium text-slate-400 mb-1 block">Icon</label>
-                                    <ImageUploadZone
-                                        label=""
-                                        subLabel="Square · max 2MB"
-                                        currentUrl={editIconUrl}
-                                        aspectClass="w-20 h-20"
-                                        onUpload={url => setEditIconUrl(url)}
-                                        onRemove={() => setEditIconUrl(null)}
-                                    />
-                                </div>
+                                {/* Icon — preset preview OR upload zone */}
+                                {editIconUrl && isPresetUrl(editIconUrl) ? (
+                                    <div className="flex-shrink-0">
+                                        <label className="text-xs font-medium text-slate-400 mb-1 block">Icon</label>
+                                        <div
+                                            className="w-20 h-20 rounded-xl flex items-center justify-center relative group"
+                                            style={{ background: editColor || '#334155' }}
+                                        >
+                                            {renderCategoryIcon({ iconUrl: editIconUrl, name: editName, color: editColor, size: 48 })}
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditIconUrl(null)}
+                                                className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 rounded-full text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-shrink-0">
+                                        <label className="text-xs font-medium text-slate-400 mb-1 block">Icon</label>
+                                        <ImageUploadZone
+                                            label=""
+                                            subLabel="Square · max 2MB"
+                                            currentUrl={editIconUrl}
+                                            aspectClass="w-20 h-20"
+                                            onUpload={url => setEditIconUrl(url)}
+                                            onRemove={() => setEditIconUrl(null)}
+                                        />
+                                    </div>
+                                )}
 
                                 {/* Name + Description */}
                                 <div className="flex-1 space-y-3">
@@ -337,6 +475,13 @@ const CategoriesPage = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Preset icon library */}
+                            <CategoryIconLibrary
+                                currentUrl={editIconUrl}
+                                categoryColor={editColor}
+                                onSelect={url => setEditIconUrl(url)}
+                            />
 
                             {/* Color picker + Sort order */}
                             <div className="flex items-start gap-6">

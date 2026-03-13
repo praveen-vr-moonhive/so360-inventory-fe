@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, Search, Plus, X } from 'lucide-react';
 import { ItemCategory } from '../../types/inventory';
 import { buildCategoryTree, flattenTree } from '../../utils/categoryTree';
+import { renderCategoryIcon } from '../../constants/categoryIcons';
 
 interface CategoryPickerProps {
     categories: ItemCategory[];
@@ -92,7 +93,6 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ categories, value, onCh
                         </button>
                         {filtered.map(node => {
                             const path = search.trim() && node.depth > 0 ? getPath(node.id) : null;
-                            const iconBg = node.color || '#334155';
                             return (
                                 <button
                                     key={node.id}
@@ -101,13 +101,13 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ categories, value, onCh
                                     className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-700/50 transition-colors flex items-center gap-2 ${node.id === value ? 'text-blue-400 bg-blue-500/10' : 'text-slate-300'}`}
                                     style={{ paddingLeft: search.trim() ? '16px' : `${node.depth * 16 + 16}px` }}
                                 >
-                                    {node.icon_url ? (
-                                        <img src={node.icon_url} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                                    ) : (
-                                        <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center text-xs font-bold text-white" style={{ background: iconBg }}>
-                                            {node.name.charAt(0).toUpperCase()}
-                                        </div>
-                                    )}
+                                    {renderCategoryIcon({
+                                        iconUrl: node.icon_url,
+                                        imageUrl: node.image_url,
+                                        name: node.name,
+                                        color: node.color,
+                                        size: 20,
+                                    })}
                                     <span className="truncate">
                                         {path || (node.depth > 0 && !search.trim() ? (
                                             <><span className="text-slate-600">{'  '.repeat(node.depth)}└ </span>{node.name}</>

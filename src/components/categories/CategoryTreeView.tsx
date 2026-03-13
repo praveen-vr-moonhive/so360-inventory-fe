@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { ChevronRight, ChevronDown, Plus, Pencil, Trash2, X, Check, Camera, Loader2 } from 'lucide-react';
 import { TreeNode } from '../../utils/categoryTree';
 import { mediaService } from '../../services/mediaService';
+import { renderCategoryIcon } from '../../constants/categoryIcons';
 
 const PRESET_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#06B6D4', '#64748B'];
 
@@ -51,38 +52,38 @@ const CategoryAvatar: React.FC<{
     };
 
     const bg = node.color || '#334155';
-    const letter = node.name.charAt(0).toUpperCase();
 
     return (
         <div className="relative flex-shrink-0">
-            <label className={`block w-7 h-7 rounded-lg overflow-hidden cursor-pointer group/avatar ${canManage ? 'cursor-pointer' : 'cursor-default'}`}>
-                {uploading ? (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: bg }}>
-                        <Loader2 size={12} className="text-white animate-spin" />
-                    </div>
-                ) : node.icon_url ? (
-                    <div className="relative w-full h-full">
-                        <img src={node.icon_url} alt={node.name} className="w-full h-full object-cover" />
-                        {canManage && (
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
-                                <Camera size={10} className="text-white" />
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white relative" style={{ background: bg }}>
-                        {letter}
-                        {canManage && (
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
-                                <Camera size={10} className="text-white" />
-                            </div>
-                        )}
-                    </div>
-                )}
+            <label className={`block w-7 h-7 rounded-lg overflow-hidden group/avatar ${canManage ? 'cursor-pointer' : 'cursor-default'}`}>
+                <div className="relative w-full h-full">
+                    {uploading ? (
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: bg }}>
+                            <Loader2 size={12} className="text-white animate-spin" />
+                        </div>
+                    ) : renderCategoryIcon({
+                        iconUrl: node.icon_url,
+                        imageUrl: node.image_url,
+                        name: node.name,
+                        color: node.color,
+                        size: 28,
+                    })}
+                    {canManage && !uploading && (
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                            <Camera size={10} className="text-white" />
+                        </div>
+                    )}
+                </div>
                 {canManage && (
                     <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden" onChange={handleFileChange} />
                 )}
             </label>
+            {node.image_url && !node.icon_url && (
+                <span
+                    className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border border-slate-900"
+                    title="Has banner image"
+                />
+            )}
             {uploadError && (
                 <div className="absolute left-0 top-8 z-10 bg-rose-900 border border-rose-500/50 text-rose-300 text-xs px-2 py-1 rounded whitespace-nowrap">
                     {uploadError}
