@@ -27,7 +27,7 @@ jobs:
       run: |
         ssh-keyscan $SERVER_IP >> ~/.ssh/known_hosts
         ssh root@$SERVER_IP "mkdir -p $BUILD_DIR && cd $BUILD_DIR && export NVM_DIR=\$HOME/.nvm && [ -s \$NVM_DIR/nvm.sh ] && . \$NVM_DIR/nvm.sh && nvm use 22 && npm ci --production=false && export VITE_BASE_URL=https://dev.inventory.skyoffice360.com/ && npm run build && mkdir -p $NGINX_ROOT && cp -r dist/* $NGINX_ROOT/"
-        rsync -avz --delete --exclude 'node_modules' --exclude 'dist' --exclude '.git' ./ root@$SERVER_IP:$BUILD_DIR/
+        rsync -avz --delete --exclude 'node_modules' --exclude 'dist' --exclude '.git' ./ "root@$SERVER_IP:$BUILD_DIR/"
 
     - name: Deploy to Staging
       if: github.ref == 'refs/heads/qa'
@@ -38,5 +38,5 @@ jobs:
       run: |
         ssh-keyscan $SERVER_IP >> ~/.ssh/known_hosts
         ssh root@$SERVER_IP "mkdir -p $BUILD_DIR"
-        rsync -avz --delete --exclude 'node_modules' --exclude 'dist' --exclude '.git' ./ root@$SERVER_IP:$BUILD_DIR/
+        rsync -avz --delete --exclude 'node_modules' --exclude 'dist' --exclude '.git' ./ "root@$SERVER_IP:$BUILD_DIR/"
         ssh root@$SERVER_IP "cd $BUILD_DIR && export NVM_DIR=\$HOME/.nvm && [ -s \$NVM_DIR/nvm.sh ] && . \$NVM_DIR/nvm.sh && nvm use 22 && npm ci --production=false && export VITE_BASE_URL=https://staging.inventory.skyoffice360.com/ && npm run build && mkdir -p $NGINX_ROOT && cp -r dist/* $NGINX_ROOT/"
