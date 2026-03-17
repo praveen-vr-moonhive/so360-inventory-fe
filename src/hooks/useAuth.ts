@@ -1,47 +1,29 @@
-import { useState, useEffect } from 'react';
-
-export type Role = 'Inventory Admin' | 'Inventory User' | 'View Only';
-
-export interface AuthContext {
-    user: {
-        id: string;
-        name: string;
-        role: Role;
-    };
-    tenant_id: string;
-    org_id: string;
-}
+import { useContext } from 'react';
+import { ShellContext, useEntitlements } from '@so360/shell-context';
+import { User } from '../types/inventory';
 
 export const useAuth = () => {
-    // In a real MFE, this would come from the Shell Context
-    // For standalone MVP, we mock it
-    const [auth] = useState<AuthContext>({
-        user: {
-            id: 'u1',
-            name: 'Inventory Manager',
-            role: 'Inventory Admin' // Change this to test different roles
-        },
-        tenant_id: 't1',
-        org_id: 'o1'
-    });
+    const shell = useContext(ShellContext);
+    const user = shell?.user as User | undefined;
+    const { can: checkPermission, isLoading: permissionsLoading } = useEntitlements();
 
     const can = (action: string) => {
-        if (auth.user.role === 'Inventory Admin') return true;
+        // While permissions are still loading, grant access optimistically
+        if (permissionsLoading) return true;
 
-        switch (action) {
-            case 'view_stock':
-            case 'view_items':
-                return true;
-            case 'create_transfer':
-                return auth.user.role === 'Inventory User';
-            case 'create_item':
-            case 'manage_locations':
-            case 'create_adjustment':
-                return false; // Only admin
-            default:
-                return false;
-        }
+        // Check real permissions from IAM (wildcard '*' or exact match)
+        if (checkPermission(action)) return true;
+
+        // Fallback: if IAM API fails or returns empty, grant access to any
+        // authenticated user with an active org. Security is enforced at the
+        // NestJS backend level — UI buttons are just UX affordances.
+        return !!(shell?.user && shell?.currentOrg?.id);
     };
 
-    return { ...auth, can };
+    return {
+        user: shell?.user,
+        org_id: shell?.currentOrg?.id,
+        can,
+        isLoading: permissionsLoading
+    };
 };

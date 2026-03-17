@@ -1,87 +1,136 @@
-export interface User {
+export interface Unit {
     id: string;
-    full_name: string;
-    avatar_url?: string;
-    email: string;
-    role?: 'Inventory Admin' | 'Inventory User' | 'View Only';
+    name: string;
+    abbreviation: string;
 }
 
-export type ItemType = 'Product' | 'Service';
-export type ItemStatus = 'Active' | 'Inactive';
+export interface ItemCategory {
+    id: string;
+    name: string;
+    description?: string;
+    parent_id?: string;
+    children?: ItemCategory[];
+    icon_url?: string | null;
+    image_url?: string | null;
+    color?: string | null;
+    sort_order?: number;
+}
 
 export interface Item {
     id: string;
     sku: string;
     name: string;
-    type: ItemType;
-    unit_of_measure: string;
-    cost_price: number;
-    selling_price: number;
-    status: ItemStatus;
-    created_at: string;
+    type: 'product' | 'service' | 'raw_material' | 'finished_good' | 'consumable' | 'fixed_asset';
+    is_active: boolean;
+    is_batch_tracked: boolean;
+    is_serial_tracked: boolean;
+    min_stock_threshold: number;
+    unit_id?: string;
+    category_id?: string;
+    units?: Unit;
+    item_categories?: ItemCategory;
+    price?: number;
+    cost?: number;
+    description?: string;
+    image_urls?: string[];
+    barcode?: string;
+    brand?: string;
+    hsn_code?: string;
+    tax_class?: string;
+    weight?: number;
+    weight_unit?: string;
+    dimensions?: { length?: number; width?: number; height?: number; unit?: string };
+    reorder_level?: number;
+    product_type_id?: string;
+    custom_attributes?: Record<string, any>;
+    product_types?: {
+        id: string;
+        name: string;
+        code: string;
+        icon?: string;
+        product_type_attributes?: Array<{
+            id: string;
+            field_name: string;
+            label: string;
+            field_type: string;
+            options?: string[];
+            unit?: string;
+            sort_order: number;
+        }>;
+    };
+    cost_center_id?: string;
+    default_warehouse_id?: string;
+    is_online_visible?: boolean;
+    lifecycle_flow_instance_id?: string;
+    tax_code_id?: string;
+    product_status?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
-export interface StockLocation {
+export interface WarehouseBin {
+    id: string;
+    location_id: string;
+    code: string;
+    capacity_metadata?: Record<string, any>;
+    is_active: boolean;
+    created_at?: string;
+}
+
+export interface WarehouseLocation {
+    id: string;
+    warehouse_id: string;
+    name: string;
+    code: string;
+    is_active: boolean;
+    created_at?: string;
+    warehouse_bins?: WarehouseBin[];
+}
+
+export interface Warehouse {
     id: string;
     name: string;
+    code: string;
     address?: string;
-    is_default: boolean;
+    is_active: boolean;
+    warehouse_locations?: WarehouseLocation[];
 }
 
-export interface StockLevel {
+export interface StockBalance {
     id: string;
     item_id: string;
-    item_name: string;
-    sku: string;
-    location_id: string;
-    location_name: string;
-    available_quantity: number;
-    unit: string;
+    warehouse_id: string;
+    location_id?: string;
+    batch_id?: string;
+    quantity: number;
+    valuation: number;
     last_updated_at: string;
+    items: Item;
+    warehouses: Warehouse;
+    warehouse_locations?: { name: string };
 }
 
-export type AdjustmentType = 'Increase' | 'Decrease';
-
-export interface StockAdjustment {
+export interface StockMovement {
     id: string;
     item_id: string;
-    item_name: string;
-    location_id: string;
-    location_name: string;
-    type: AdjustmentType;
+    warehouse_id: string;
+    type: 'inbound' | 'outbound' | 'transfer' | 'adjustment';
     quantity: number;
-    reason: string;
-    date: string;
-    created_by_name: string;
-}
-
-export type TransferStatus = 'Draft' | 'Completed';
-
-export interface StockTransfer {
-    id: string;
-    from_location_id: string;
-    from_location_name: string;
-    to_location_id: string;
-    to_location_name: string;
-    item_id: string;
-    item_name: string;
-    quantity: number;
-    status: TransferStatus;
-    date: string;
-    created_by_name: string;
-}
-
-export interface LedgerEntry {
-    id: string;
-    date: string;
-    movement_type: string;
-    quantity_change: number; // Positive for increase, negative for decrease
-    location_name: string;
-    reference: string;
-    created_by_name: string;
+    reason_code?: string;
+    reference_type?: string;
+    created_at: string;
+    items: Item;
+    warehouses: Warehouse;
 }
 
 export interface InventorySettings {
     uoms: string[];
     categories: string[];
+}
+
+export interface User {
+    id: string;
+    full_name: string;
+    email: string;
+    role?: 'Inventory Admin' | 'Inventory User' | 'View Only' | 'Admin';
 }
