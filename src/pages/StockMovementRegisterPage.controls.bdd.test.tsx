@@ -322,14 +322,26 @@ describe('Given the Project and Work Order allocation dropdowns', () => {
     });
 
     it('Given active projects exist / When the form renders / Then they are selectable', async () => {
+        // The Projects API's real field is `title`, not `name` (so360-projects-be
+        // CreateProjectDto/`projects` table). A prior version of this test mocked
+        // `name`, which matched the (buggy) component code but not reality, so the
+        // bug where every option rendered blank shipped green.
         inv.searchProjects.mockResolvedValue([
-            { id: 'p-1', name: 'Marina Tower Fit-out' },
-            { id: 'p-2', name: 'Warehouse Retrofit' },
+            { id: 'p-1', title: 'Marina Tower Fit-out' },
+            { id: 'p-2', title: 'Warehouse Retrofit' },
         ]);
         await openForm();
         const select = screen.getByLabelText('Project');
         expect(within(select).getByText('Marina Tower Fit-out')).toBeInTheDocument();
         expect(select).not.toBeDisabled();
+    });
+
+    it('Given a project only has the legacy `name` field (no `title`) / When the form renders / Then it still displays', async () => {
+        inv.searchProjects.mockResolvedValue([{ id: 'p-1', name: 'Legacy Named Project' }]);
+        await openForm();
+        expect(
+            within(screen.getByLabelText('Project')).getByText('Legacy Named Project'),
+        ).toBeInTheDocument();
     });
 
     it('Given work orders exist / When rendered / Then each shows its number, description and status', async () => {
@@ -345,7 +357,7 @@ describe('Given the Project and Work Order allocation dropdowns', () => {
     });
 
     it('Given a project is selected / When work orders belong to other projects / Then only that project\'s orders remain', async () => {
-        inv.searchProjects.mockResolvedValue([{ id: 'p-1', name: 'Marina Tower Fit-out' }]);
+        inv.searchProjects.mockResolvedValue([{ id: 'p-1', title: 'Marina Tower Fit-out' }]);
         inv.searchWorkOrders.mockResolvedValue([
             { id: 'wo-1', code: 'WO-0007', project_id: 'p-1', status: 'in_progress' },
             { id: 'wo-2', code: 'WO-0008', project_id: 'p-9', status: 'in_progress' },
@@ -380,8 +392,29 @@ describe('Given the Project and Work Order allocation dropdowns', () => {
         );
     });
 
+    it('Given a project is selected by its title / When submitted / Then project_name_snapshot carries that title', async () => {
+        inv.searchProjects.mockResolvedValue([{ id: 'p-1', title: 'Marina Tower Fit-out' }]);
+        await openForm();
+        await selectItem();
+        fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: WH } });
+        fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'PURCHASE_RECEIPT' } });
+        fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '2' } });
+        fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'p-1' } });
+
+        fireEvent.click(screen.getByText('Record Transaction'));
+
+        await waitFor(() =>
+            expect(inv.createAdjustment).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    project_id: 'p-1',
+                    project_name_snapshot: 'Marina Tower Fit-out',
+                }),
+            ),
+        );
+    });
+
     it('Given a project-site movement without a project / When submitted / Then the project is demanded beside its field', async () => {
-        inv.searchProjects.mockResolvedValue([{ id: 'p-1', name: 'Marina Tower Fit-out' }]);
+        inv.searchProjects.mockResolvedValue([{ id: 'p-1', title: 'Marina Tower Fit-out' }]);
         await openForm();
         await selectItem();
         fireEvent.change(screen.getByLabelText('Warehouse'), { target: { value: WH } });

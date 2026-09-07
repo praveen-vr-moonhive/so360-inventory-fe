@@ -459,7 +459,9 @@ const StockMovementRegisterPage = () => {
             project_id: form.project_id || undefined,
             work_order_id: form.work_order_id || undefined,
             project_name_snapshot:
-                projects.find((p) => p.id === form.project_id)?.name || undefined,
+                projects.find((p) => p.id === form.project_id)?.title
+                || projects.find((p) => p.id === form.project_id)?.name
+                || undefined,
             work_order_number_snapshot:
                 workOrders.find((w) => w.id === form.work_order_id)?.code || undefined,
             source_type: form.source_type || undefined,
@@ -793,7 +795,7 @@ const StockMovementRegisterPage = () => {
                         >
                             <option value="">All</option>
                             {projects.map((p) => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
+                                <option key={p.id} value={p.id}>{p.title || p.name}</option>
                             ))}
                         </select>
                     </div>
@@ -1112,7 +1114,7 @@ const StockMovementRegisterPage = () => {
                                         {projects.length === 0 ? 'No active projects available.' : 'Not linked'}
                                     </option>
                                     {projects.map((p) => (
-                                        <option key={p.id} value={p.id} className="bg-slate-800 text-slate-50">{p.name}</option>
+                                        <option key={p.id} value={p.id} className="bg-slate-800 text-slate-50">{p.title || p.name}</option>
                                     ))}
                                 </select>
                                 <FieldError field="project" />
