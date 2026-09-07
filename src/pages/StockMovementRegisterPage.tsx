@@ -1102,12 +1102,17 @@ const StockMovementRegisterPage = () => {
                                     disabled={projects.length === 0}
                                 >
                                     {/* "Not linked" alone told the user nothing about why the
-                                        list was empty. An empty result now says so explicitly. */}
-                                    <option value="">
+                                        list was empty. An empty result now says so explicitly.
+                                        bg/text set explicitly on each <option> because native
+                                        dropdown popups don't reliably inherit the <select>'s
+                                        Tailwind classes — without this the options render with
+                                        the browser's default light popup background and the
+                                        same light text colour, making them invisible. */}
+                                    <option value="" className="bg-slate-800 text-slate-50">
                                         {projects.length === 0 ? 'No active projects available.' : 'Not linked'}
                                     </option>
                                     {projects.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                        <option key={p.id} value={p.id} className="bg-slate-800 text-slate-50">{p.name}</option>
                                     ))}
                                 </select>
                                 <FieldError field="project" />
