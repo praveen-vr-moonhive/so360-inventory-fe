@@ -484,6 +484,7 @@ const StockMovementRegisterPage = () => {
                     warehouse_id: form.warehouse_id,
                     quantity: signedQuantity as number,
                     reason_code: form.reason_code,
+                    transaction_type: form.transaction_type,
                     ...allocation,
                 });
             }

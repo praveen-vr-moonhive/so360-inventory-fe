@@ -273,6 +273,12 @@ describe('Stock Movement Register — entry form guards', () => {
                     quantity: 25,
                     reason_code: 'PURCHASE_RECEIPT',
                     remarks: 'Received in good condition',
+                    // Root-cause regression check: the backend only writes movement_type
+                    // "inbound"/"outbound" (and shows the correct RECEIPT/ISSUE badge +
+                    // Inbound/Outbound filter match) when the transaction type actually
+                    // reaches it. Previously this field was dropped by the modal, so
+                    // every stock-in/out was silently stored as a generic "adjustment".
+                    transaction_type: 'stock_in',
                 }),
             ),
         );

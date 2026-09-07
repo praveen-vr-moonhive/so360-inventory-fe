@@ -300,6 +300,47 @@ describe('inventoryService', () => {
     });
   });
 
+  describe('Given searchProjects (Stock Out / Transfer "Project" dropdown)', () => {
+    // The Projects backend controller is mounted at `/projects`, not `/v1/projects`
+    // (confirmed: so360-projects-be has no global prefix/versioning). Calling
+    // `/v1/projects` 404s, the catch swallows it, and the dropdown always showed
+    // "No active projects available" even when projects existed.
+    it('When called / Then GETs the real Projects route without a /v1 prefix', async () => {
+      mockFetch.mockReturnValue(jsonOk({ data: [] }));
+      await inventoryService.searchProjects();
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toMatch(/\/projects\?/);
+      expect(url).not.toContain('/v1/projects');
+    });
+
+    it('When the Projects API returns open projects / Then they are returned', async () => {
+      mockFetch.mockReturnValue(
+        jsonOk({ data: [{ id: 'p1', name: 'Sobha Dream Acres', status: 'active' }] }),
+      );
+      const result = await inventoryService.searchProjects();
+      expect(result).toEqual([{ id: 'p1', name: 'Sobha Dream Acres', status: 'active' }]);
+    });
+
+    it('When the Projects API returns closed projects / Then they are filtered out', async () => {
+      mockFetch.mockReturnValue(
+        jsonOk({
+          data: [
+            { id: 'p1', name: 'Open Project', status: 'active' },
+            { id: 'p2', name: 'Done Project', status: 'completed' },
+          ],
+        }),
+      );
+      const result = await inventoryService.searchProjects();
+      expect(result).toEqual([{ id: 'p1', name: 'Open Project', status: 'active' }]);
+    });
+
+    it('When the Projects API request fails / Then returns an empty array rather than throwing', async () => {
+      mockFetch.mockReturnValue(Promise.resolve({ ok: false, status: 404, json: async () => ({}) }));
+      const result = await inventoryService.searchProjects();
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('Given product lifecycle', () => {
     it('When transitionLifecycle called / Then sends POST', async () => {
       mockFetch.mockReturnValue(jsonOk({ ok: true }));

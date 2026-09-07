@@ -689,7 +689,7 @@ class InventoryService {
             const origin = this.crossServiceOrigin('VITE_SO360_PROJECTS_API', 'projects', 3010);
             const qs = new URLSearchParams({ limit: '50' });
             if (search) qs.append('search', search);
-            const res = await this.crossServiceGet(`${origin}/v1/projects?${qs.toString()}`);
+            const res = await this.crossServiceGet(`${origin}/projects?${qs.toString()}`);
             const list = res?.data || res?.projects || (Array.isArray(res) ? res : []);
             return (Array.isArray(list) ? list : []).filter(
                 (p: any) => !CLOSED_PROJECT_STATUSES.has(String(p?.status || '').toLowerCase()),
