@@ -29,27 +29,6 @@ export const formatPercentage = (n: number) => `${n}%`;
 export const getCurrencySymbol = () => '$';
 export const formatCompactCurrency = (v: number) => `$${v}`;
 
-export const useFormatters = (config: { currency?: string; locale?: string; timezone?: string } = {}) => {
-  const currency = config.currency || 'USD';
-  const locale = config.locale || 'en-US';
-  const timezone = config.timezone || 'UTC';
-  return {
-    formatCurrency: (v: number) =>
-      new Intl.NumberFormat(locale, { style: 'currency', currency }).format(Number(v) || 0),
-    formatDate: (d: Date | string | number | null | undefined) => formatDate(d, timezone, locale),
-    formatDateTime: (d: Date | string | number | null | undefined) => formatDateTime(d, timezone, locale),
-    formatRelativeTime: (d: Date | string | number | null | undefined) => (d ? String(d) : '-'),
-    formatNumber: (n: number) => String(n),
-    formatPercent: (n: number) => `${n}%`,
-    formatPercentage: (n: number) => `${n}%`,
-    getCurrencySymbol: () => '$',
-    formatCompactCurrency: (v: number) => `$${v}`,
-    currency,
-    locale,
-    timezone,
-  };
-};
-
 // ── Date-only (business date) primitives ────────────────────────────────────
 // vitest.config.ts aliases '@so360/formatters' to THIS file, so it is what every
 // spec resolves. Real implementations, not passthroughs: a passthrough would
@@ -93,4 +72,32 @@ export const endOfBusinessDayUtcExclusive = (businessDate: string, timezone: str
   const s = startOfBusinessDayUtc(businessDate, timezone);
   if (isNaN(s.getTime())) return s;
   return startOfBusinessDayUtc(toBusinessDate(new Date(s.getTime() + 36 * 3600 * 1000), timezone), timezone);
+};
+
+export const useFormatters = (config: { currency?: string; locale?: string; timezone?: string } = {}) => {
+  const currency = config.currency || 'USD';
+  const locale = config.locale || 'en-US';
+  const timezone = config.timezone || 'UTC';
+  return {
+    formatCurrency: (v: number) =>
+      new Intl.NumberFormat(locale, { style: 'currency', currency }).format(Number(v) || 0),
+    formatDate: (d: Date | string | number | null | undefined) => formatDate(d, timezone, locale),
+    formatDateTime: (d: Date | string | number | null | undefined) => formatDateTime(d, timezone, locale),
+    formatRelativeTime: (d: Date | string | number | null | undefined) => (d ? String(d) : '-'),
+    formatNumber: (n: number) => String(n),
+    formatPercent: (n: number) => `${n}%`,
+    formatPercentage: (n: number) => `${n}%`,
+    getCurrencySymbol: () => '$',
+    formatCompactCurrency: (v: number) => `$${v}`,
+    // The primitives must be ON THE HOOK, not merely exported alongside it.
+    // Components call formatters.businessToday(); exporting the bare function
+    // satisfies a direct import but leaves the hook's object without the key.
+    toBusinessDate: (d: Date | string | number | null | undefined) => toBusinessDate(d, timezone),
+    businessToday: () => businessToday(timezone),
+    startOfBusinessDayUtc: (d: string) => startOfBusinessDayUtc(d, timezone),
+    endOfBusinessDayUtcExclusive: (d: string) => endOfBusinessDayUtcExclusive(d, timezone),
+    currency,
+    locale,
+    timezone,
+  };
 };
