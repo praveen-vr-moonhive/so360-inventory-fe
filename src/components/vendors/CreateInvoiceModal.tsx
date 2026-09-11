@@ -23,7 +23,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 }) => {
     const formatters = useInventoryFormatters();
     const [invoiceNumber, setInvoiceNumber] = useState('');
-    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [invoiceDate, setInvoiceDate] = useState(formatters.businessToday());
     const [dueDate, setDueDate] = useState('');
     const [totalAmount, setTotalAmount] = useState('');
     const [selectedPO, setSelectedPO] = useState('');
@@ -38,7 +38,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
     const resetForm = () => {
         setInvoiceNumber('');
-        setInvoiceDate(new Date().toISOString().split('T')[0]);
+        setInvoiceDate(formatters.businessToday());
         setDueDate('');
         setTotalAmount('');
         setSelectedPO('');

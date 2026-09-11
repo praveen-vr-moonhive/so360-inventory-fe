@@ -4,6 +4,7 @@ import { procurementService } from '../../services/procurementService';
 import { vendorService } from '../../services/vendorService';
 import { inventoryService } from '../../services/inventoryService';
 import ItemSearchSelector from '../../components/ItemSearchSelector';
+import { useInventoryFormatters } from '../../utils/formatters';
 
 interface LineItem {
     item_id: string;
@@ -16,7 +17,10 @@ interface LineItem {
 
 const OpeningBalancePage = () => {
     const navigate = useNavigate();
-    const today = new Date().toISOString().split('T')[0];
+    const formatters = useInventoryFormatters();
+    // Org business date, not the UTC day: an opening balance dated a day
+    // early lands in the wrong stock period.
+    const today = formatters.businessToday();
 
     const [vendors, setVendors] = useState<any[]>([]);
     const [warehouses, setWarehouses] = useState<any[]>([]);
